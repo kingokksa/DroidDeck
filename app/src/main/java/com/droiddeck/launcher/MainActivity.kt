@@ -707,7 +707,7 @@ class MainActivity : ComponentActivity() {
                         onLanguage = { tag ->
                             if (tag != com.droiddeck.launcher.core.AppLanguage.chosen(this)) {
                                 com.droiddeck.launcher.core.AppLanguage.setChosen(this, tag)
-                                syncDesktopLanguage(notify = true)
+                                syncDesktopLanguage()
                                 recreate()
                             }
                         },
@@ -1189,12 +1189,10 @@ class MainActivity : ComponentActivity() {
         syncDesktopLanguage()
     }
 
-    private fun syncDesktopLanguage(notify: Boolean = false) {
+    private fun syncDesktopLanguage() {
         Thread({
             if (!com.droiddeck.launcher.runtime.DesktopLanguage.needed(this)) return@Thread
-            val problem = com.droiddeck.launcher.runtime.DesktopLanguage.sync(this) ?: return@Thread
-            Log.w(TAG, problem)
-            if (notify) ui.post { android.widget.Toast.makeText(this, problem, android.widget.Toast.LENGTH_LONG).show() }
+            com.droiddeck.launcher.runtime.DesktopLanguage.sync(this)?.let { Log.w(TAG, it) }
         }, "desktop-language").start()
     }
 
