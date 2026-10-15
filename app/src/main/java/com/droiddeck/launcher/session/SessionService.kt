@@ -621,7 +621,6 @@ class SessionService : Service() {
             guest.add("FAKE_EVDEV_UINPUT=1")
             if (SessionState.deckPad) {
                 guest.add("FAKE_EVDEV_DECK=1")
-                if (directSession()) guest.add("FAKE_EVDEV_PAD_WATCH=1")
                 if (wantsTriton) guest.add("FAKE_EVDEV_TRITON=1")
                 val padType = SessionPrefs.steamController(this)
                 guest.add("FAKE_EVDEV_PAD_TYPE=$padType")
