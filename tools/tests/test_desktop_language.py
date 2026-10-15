@@ -18,6 +18,8 @@ STEAM_LAUNCH = ROOT / 'tools/linuxfs/overlay/usr/local/bin/droiddeck-steam-launc
 SESSION_SERVICE = ROOT / 'app/src/main/java/com/droiddeck/launcher/session/SessionService.kt'
 LANGUAGE_KT = ROOT / 'app/src/main/java/com/droiddeck/launcher/runtime/DesktopLanguage.kt'
 APP_LANGUAGE_KT = ROOT / 'app/src/main/java/com/droiddeck/launcher/core/AppLanguage.kt'
+DOWNLOADER = ROOT / 'app/src/main/java/com/droiddeck/launcher/core/Downloader.java'
+MAIN_ACTIVITY = ROOT / 'app/src/main/java/com/droiddeck/launcher/MainActivity.kt'
 
 CATALOGUES = {
     'ar', 'bg', 'cs', 'da', 'de', 'el', 'es', 'fi', 'fr', 'hi', 'hu', 'id', 'it', 'ja', 'ko', 'ms',
@@ -126,6 +128,24 @@ class DesktopLanguageSessionTest(unittest.TestCase):
         language = read(LANGUAGE_KT)
         self.assertIn('AppLanguage.linuxLocale(AppLanguage.selectedTag(context))', language)
         self.assertIn('AppLanguage.desktopTag(AppLanguage.selectedTag(context))', language)
+
+    def test_the_packs_are_fetched_with_a_timeout_the_link_can_meet(self):
+        language = read(LANGUAGE_KT)
+        self.assertIn('Downloader.downloadString(url, TIMEOUT_MS)', language)
+        self.assertIn('Downloader.downloadFile(packUrl(pack.tag), download, true, TIMEOUT_MS)', language)
+        self.assertIn('private const val TIMEOUT_MS = 120_000', language)
+        self.assertIn('private const val ATTEMPTS = 3', language)
+        self.assertIn('private const val COOLDOWN_MS = 300_000', language)
+        self.assertIn('if (!ok) return context.getString(R.string.user_apps_download_failed)', language)
+        downloader = read(DOWNLOADER)
+        self.assertIn('public static String downloadString(String url, int timeoutMs)', downloader)
+        self.assertIn('boolean downloadFile(String url, File destination, boolean resume, int timeoutMs,', downloader)
+        self.assertIn('private static HttpURLConnection open(String url, int timeoutMs)', downloader)
+        self.assertIn('connection.setConnectTimeout(timeoutMs)', downloader)
+
+    def test_the_launcher_retries_the_sync_every_time_it_comes_back(self):
+        resume = read(MAIN_ACTIVITY).split('override fun onResume()', 1)[1].split('override fun onStart()', 1)[0]
+        self.assertIn('syncDesktopLanguage()', resume)
 
 
 if __name__ == '__main__':

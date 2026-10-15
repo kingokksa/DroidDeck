@@ -19,9 +19,13 @@ public final class Downloader {
     private Downloader() {}
 
     public static String downloadString(String url) {
+        return downloadString(url, TIMEOUT_MS);
+    }
+
+    public static String downloadString(String url, int timeoutMs) {
         HttpURLConnection connection = null;
         try {
-            connection = open(url);
+            connection = open(url, timeoutMs);
             if (connection.getResponseCode() / 100 != 2) {
                 Log.w(TAG, url + " -> HTTP " + connection.getResponseCode());
                 return null;
@@ -41,10 +45,15 @@ public final class Downloader {
 
     public static boolean downloadFile(String url, File destination, boolean resume,
                                        java.util.function.Consumer<Float> progress) {
+        return downloadFile(url, destination, resume, TIMEOUT_MS, progress);
+    }
+
+    public static boolean downloadFile(String url, File destination, boolean resume, int timeoutMs,
+                                       java.util.function.Consumer<Float> progress) {
         HttpURLConnection connection = null;
         long have = resume && destination.isFile() ? destination.length() : 0;
         try {
-            connection = open(url);
+            connection = open(url, timeoutMs);
             if (have > 0) connection.setRequestProperty("Range", "bytes=" + have + "-");
             int code = connection.getResponseCode();
             boolean appending = code == HttpURLConnection.HTTP_PARTIAL;
@@ -52,13 +61,13 @@ public final class Downloader {
                 // A 206 that does not begin where the kept bytes end would corrupt the file if appended.
                 connection.disconnect();
                 destination.delete();
-                return downloadFile(url, destination, false, progress);
+                return downloadFile(url, destination, false, timeoutMs, progress);
             }
             if (code / 100 != 2) {
                 if (have > 0) {
                     connection.disconnect();
                     destination.delete();
-                    return downloadFile(url, destination, false, progress);
+                    return downloadFile(url, destination, false, timeoutMs, progress);
                 }
                 Log.w(TAG, url + " -> HTTP " + code);
                 return false;
@@ -100,10 +109,10 @@ public final class Downloader {
         return m.matches() && Long.parseLong(m.group(1)) == start;
     }
 
-    private static HttpURLConnection open(String url) throws java.io.IOException {
+    private static HttpURLConnection open(String url, int timeoutMs) throws java.io.IOException {
         HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-        connection.setConnectTimeout(TIMEOUT_MS);
-        connection.setReadTimeout(TIMEOUT_MS);
+        connection.setConnectTimeout(timeoutMs);
+        connection.setReadTimeout(timeoutMs);
         connection.setInstanceFollowRedirects(true);
         connection.setRequestProperty("User-Agent", "DroidDeck-Android");
         return connection;

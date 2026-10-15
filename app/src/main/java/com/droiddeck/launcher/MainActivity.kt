@@ -977,6 +977,7 @@ class MainActivity : ComponentActivity() {
         decky.deckySupervisor = DeckyManager.supervisorEnabled(this)
         refreshAddedGames()
         if (catalog == null) loadDesktopCatalog()
+        syncDesktopLanguage()
         if (!busy) Thread({ checkCatalog() }, "catalog").start()
     }
 

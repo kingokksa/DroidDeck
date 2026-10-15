@@ -17,6 +17,12 @@ object DesktopLanguage {
     private const val ARCHIVE = "desktop-kde-i18n"
     private const val LOCALES = "usr/share/locale"
     private const val OWNED = ".droiddeck-pack"
+    private const val ATTEMPTS = 3
+    private const val TIMEOUT_MS = 120_000
+    private const val COOLDOWN_MS = 300_000
+
+    @Volatile
+    private var failingUntil = 0L
 
     internal class Pack(val tag: String, val sha256: String)
 
@@ -72,6 +78,13 @@ object DesktopLanguage {
 
     @Synchronized
     fun sync(context: Context, listener: LinuxRuntimeInstaller.ProgressListener? = null): String? {
+        if (System.currentTimeMillis() < failingUntil) return context.getString(R.string.user_apps_download_failed)
+        val problem = install(context, listener)
+        failingUntil = if (problem == null) 0L else System.currentTimeMillis() + COOLDOWN_MS
+        return problem
+    }
+
+    private fun install(context: Context, listener: LinuxRuntimeInstaller.ProgressListener?): String? {
         val root = LinuxRuntime.rootDir(context)
         if (!DesktopCatalog.desktopInstalled(context)) return null
         val wanted = wanted(context)
@@ -102,17 +115,17 @@ object DesktopLanguage {
     }
 
     private fun text(url: String): String? {
-        repeat(3) { attempt ->
-            Downloader.downloadString(url)?.takeIf { it.isNotBlank() }?.let { return it }
-            if (attempt < 2) runCatching { Thread.sleep(1_500L * (attempt + 1)) }
+        repeat(ATTEMPTS) { attempt ->
+            Downloader.downloadString(url, TIMEOUT_MS)?.takeIf { it.isNotBlank() }?.let { return it }
+            if (attempt < ATTEMPTS - 1) runCatching { Thread.sleep(2_000L * (attempt + 1)) }
         }
         return null
     }
 
     private fun retry(step: () -> Boolean): Boolean {
-        repeat(3) { attempt ->
+        repeat(ATTEMPTS) { attempt ->
             if (step()) return true
-            if (attempt < 2) runCatching { Thread.sleep(1_500L * (attempt + 1)) }
+            if (attempt < ATTEMPTS - 1) runCatching { Thread.sleep(2_000L * (attempt + 1)) }
         }
         return false
     }
@@ -121,14 +134,11 @@ object DesktopLanguage {
         val name = "$ARCHIVE-${sanitize(pack.tag)}.tar.zst"
         val download = File(context.cacheDir, name)
         val ok = retry {
-            Downloader.downloadFile(packUrl(pack.tag), download, true) { fraction ->
+            Downloader.downloadFile(packUrl(pack.tag), download, true, TIMEOUT_MS) { fraction ->
                 listener?.onProgress(LinuxRuntimeInstaller.Step.DOWNLOADING, name, if (fraction < 0) -1 else Math.round(fraction * 100f))
             }
         }
-        if (!ok) {
-            download.delete()
-            return context.getString(R.string.user_apps_download_failed)
-        }
+        if (!ok) return context.getString(R.string.user_apps_download_failed)
         if (!pack.sha256.equals(runCatching { Hashes.sha256(download) }.getOrNull(), ignoreCase = true)) {
             download.delete()
             return context.getString(R.string.deskpkg_checksum_mismatch)
