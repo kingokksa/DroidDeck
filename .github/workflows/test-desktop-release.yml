@@ -53,7 +53,7 @@ jobs:
           head -3 desktop-kde.i18n.txt
           awk '{print $2"  desktop-kde-i18n-"$1".tar.zst"}' desktop-kde.i18n.txt | sha256sum -c | tail -2
           du -sh desktop-kde-i18n-*.tar.zst | sort -k1 -h | tail -3
-          for loc in de zh_CN ja ru pt_BR; do echo "-- $loc"; tar -tf "desktop-kde-i18n-$loc.tar.zst" | grep LC_MESSAGES | head -2; done
+          for loc in de zh_CN ja ru pt_BR; do echo "-- $loc"; tar -tf "desktop-kde-i18n-$loc.tar.zst" | grep LC_MESSAGES | sed -n '1,2p'; done
           for loc in ar bg cs da de el es fi fr hi hu id it ja ko ms nb nl pl pt pt_BR ro ru sv th tr uk vi zh_CN zh_TW; do
             grep -q "^$loc " desktop-kde.i18n.txt || { echo "::error::$loc is missing from the index"; exit 1; }
           done
