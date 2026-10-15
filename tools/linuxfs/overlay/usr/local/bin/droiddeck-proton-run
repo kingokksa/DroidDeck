@@ -272,6 +272,13 @@ def steam_launches(target, program, root):
 
 def environment(env, target, tool_folder, root, window=False):
     env = dict(env)
+    for library in ("libfakeinput.so", "libblsession.so"):
+        path = os.path.join("/usr/local/lib", library)
+        if not os.path.isfile(path):
+            continue
+        parts = [part for part in env.get("LD_PRELOAD", "").split(":") if part]
+        if path not in parts:
+            env["LD_PRELOAD"] = ":".join([path] + parts)
     steamapps = [os.path.join(lib, "steamapps") for lib in libraries(root)]
     env.update({
         "STEAM_COMPAT_DATA_PATH": target.compatdata,

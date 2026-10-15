@@ -606,7 +606,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
                     onQam = if (SessionState.mode == SessionService.MODE_STEAM) ({ triggerSteamQam() }) else null,
                     onAchievements = achievementsInFront?.let { { drawerOpen = false; achievementsOpen = true } },
                     achievementsProgress = achievementsInFront?.progress,
-                    padType = if (SessionState.mode == SessionService.MODE_STEAM && SessionState.deckPad) padType else null,
+                    padType = if (SessionState.deckPad) padType else null,
                     onPadType = { id ->
                         SessionPrefs.setSteamController(this@SessionActivity, id)
                         com.droiddeck.launcher.session.SteamDeckPad.showPad(SessionPrefs.padType(id))
@@ -1889,7 +1889,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         val height = sessionRoot.height
         val wanted = unfoldedControls && com.droiddeck.launcher.session.SessionDisplay.foldable(this) &&
             !PadBridge.anyControllerConnected() && !SteamControllerBle.connected &&
-            SessionState.mode == SessionService.MODE_STEAM && SessionState.deckPad &&
+            SessionState.deckPad &&
             !pipUi && !isInPictureInPictureMode && width > 0 && height > 0 &&
             resources.configuration.smallestScreenWidthDp >= com.droiddeck.launcher.session.SessionDisplay.UNFOLDED_MIN_DP
         val gameHeight = if (wanted) com.droiddeck.launcher.session.SessionDisplay.unfoldedGameHeight(width, height)
