@@ -5,11 +5,15 @@ on:
     inputs:
       tag:
         description: 'Tag to publish as here, and to read the pinned package from'
-        required: true
+        required: false
         default: 'desktop-kde-r2'
       run:
-        description: 'Run that built the language packs'
-        required: true
+        description: 'Run that built the language packs; empty = the last successful one'
+        required: false
+        default: ''
+  push:
+    paths:
+      - '.github/workflows/test-desktop-release.yml'
 
 permissions:
   contents: write
@@ -19,10 +23,26 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - name: Fetch the packs a build produced
+      - name: Pick the tag and the build to publish
+        id: pick
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh run download '${{ inputs.run }}' -n desktop-kde -D packs --clobber
+        run: |
+          set -euo pipefail
+          tag='${{ inputs.tag }}'
+          [ -n "$tag" ] || tag=desktop-kde-r2
+          run='${{ inputs.run }}'
+          if [ -z "$run" ]; then
+            run=$(gh run list -R "$GITHUB_REPOSITORY" -w build-desktop-kde.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          echo "publishing $tag from run $run"
+
+      - name: Fetch the packs that build produced
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download '${{ steps.pick.outputs.run }}' -n desktop-kde -D packs --clobber
 
       - name: Check the index against those packs
         run: |
@@ -41,7 +61,7 @@ jobs:
       - name: Take the pinned package the app verifies
         run: |
           set -euo pipefail
-          url="https://github.com/Droid-Deck/DroidDeck-Components/releases/download/${{ inputs.tag }}/desktop-kde.tar.zst"
+          url="https://github.com/Droid-Deck/DroidDeck-Components/releases/download/${{ steps.pick.outputs.tag }}/desktop-kde.tar.zst"
           curl -fL --retry 3 -o desktop-kde.tar.zst "$url"
           stat -c '%s bytes' desktop-kde.tar.zst
           sha256sum desktop-kde.tar.zst
@@ -52,10 +72,10 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          TAG='${{ inputs.tag }}'
+          TAG='${{ steps.pick.outputs.tag }}'
           gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
           gh release create "$TAG" --prerelease --title "$TAG (test)" \
-            --notes "Test copy: the pinned $TAG payload plus the language packs from run ${{ inputs.run }}." \
+            --notes "Test copy: the pinned $TAG payload plus the language packs from run ${{ steps.pick.outputs.run }}." \
             desktop-kde.tar.zst packs/desktop-kde.i18n.txt packs/desktop-kde-i18n-*.tar.zst
           gh release view "$TAG" --json assets --jq '"assets \(.assets | length)"'
           for asset in desktop-kde.i18n.txt desktop-kde-i18n-de.tar.zst desktop-kde-i18n-zh_CN.tar.zst desktop-kde.tar.zst; do
