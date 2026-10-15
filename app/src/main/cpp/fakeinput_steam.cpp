@@ -1310,6 +1310,15 @@ static bool fake_triton_enabled() {
   return enabled == 1;
 }
 
+static bool pad_watch_requested() {
+  static int requested = -1;
+  if (requested < 0) {
+    const char *env = getenv("FAKE_EVDEV_PAD_WATCH");
+    requested = env && *env && strcmp(env, "0") ? 1 : 0;
+  }
+  return requested == 1;
+}
+
 __attribute__((visibility("hidden"))) static bool process_is_steam_client() {
   static int known;
   if (known == 0) {
@@ -2213,7 +2222,8 @@ __attribute__((visibility("hidden"))) static void *pad_type_thread(void *) {
 
 __attribute__((constructor)) static void start_pad_type_watch() {
   config();
-  if (!process_is_steam_client() || !fake_deck_enabled()) return;
+  if (!fake_deck_enabled()) return;
+  if (!process_is_steam_client() && !pad_watch_requested()) return;
   pthread_t thread;
   if (pthread_create(&thread, nullptr, pad_type_thread, nullptr) == 0) pthread_detach(thread);
 }
