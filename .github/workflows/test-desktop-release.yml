@@ -43,7 +43,7 @@ jobs:
       - name: Fetch the packs that build produced
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh run download '${{ steps.pick.outputs.run }}' -n desktop-kde -D packs
+        run: gh run download '${{ steps.pick.outputs.run }}' -R "$GITHUB_REPOSITORY" -n desktop-kde -D packs
 
       - name: Check the index against those packs
         run: |
