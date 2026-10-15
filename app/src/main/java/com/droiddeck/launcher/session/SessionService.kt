@@ -304,7 +304,7 @@ class SessionService : Service() {
         val size = SessionState.outputSize
         val guest = ArrayList<String>()
         val steamHere = SessionState.mode == MODE_STEAM || SessionState.mode == MODE_DESKTOP
-        val direct = SessionState.mode == MODE_RUN && SessionState.program == DIRECT_LAUNCHER
+        val direct = directSession()
         if (steamHere) {
             runCatching { ComponentsManager.ensureForcedPackages(this) }
                 .onSuccess { if (it != null) Log.i(TAG, it) }
@@ -592,6 +592,9 @@ class SessionService : Service() {
         return pulse
     }
 
+    private fun directSession(): Boolean =
+        SessionState.mode == MODE_RUN && SessionState.program == DIRECT_LAUNCHER
+
     private fun addControllerEnvironment(guest: MutableList<String>, fakeInputDir: File, sessionDir: File) {
         FakeInputWriter.prepareRingSlots(fakeInputDir, 4)
         fakeInputDir.listFiles()?.forEach { file ->
@@ -604,7 +607,7 @@ class SessionService : Service() {
         guest.add("FAKE_EVDEV_IDENTITY=xbox360")
         guest.add("FAKE_EVDEV_VIBRATION=1")
         val uinput = !File(Environment.getExternalStorageDirectory(), NO_UINPUT_SWITCH).exists()
-        val wantsDeck = uinput && SessionState.mode == MODE_STEAM &&
+        val wantsDeck = uinput && (SessionState.mode == MODE_STEAM || directSession()) &&
             SessionState.steamUi != "desktop" &&
             !File(Environment.getExternalStorageDirectory(), NO_DECK_PAD_SWITCH).exists()
         val wantsTouch = wantsDeck && !File(Environment.getExternalStorageDirectory(), NO_STEAM_TOUCH_SWITCH).exists()
