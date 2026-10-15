@@ -1,0 +1,63 @@
+name: Publish a test desktop release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish as here, and to read the pinned package from'
+        required: true
+        default: 'desktop-kde-r2'
+      run:
+        description: 'Run that built the language packs'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Fetch the packs a build produced
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download '${{ inputs.run }}' -n desktop-kde -D packs --clobber
+
+      - name: Check the index against those packs
+        run: |
+          set -euo pipefail
+          cd packs
+          echo "packs $(ls desktop-kde-i18n-*.tar.zst | wc -l), index lines $(wc -l < desktop-kde.i18n.txt)"
+          head -3 desktop-kde.i18n.txt
+          awk '{print $2"  desktop-kde-i18n-"$1".tar.zst"}' desktop-kde.i18n.txt | sha256sum -c | tail -2
+          du -sh desktop-kde-i18n-*.tar.zst | sort -k1 -h | tail -3
+          for loc in de zh_CN ja ru pt_BR; do echo "-- $loc"; tar -tf "desktop-kde-i18n-$loc.tar.zst" | grep LC_MESSAGES | head -2; done
+          for loc in ar bg cs da de el es fi fr hi hu id it ja ko ms nb nl pl pt pt_BR ro ru sv th tr uk vi zh_CN zh_TW; do
+            grep -q "^$loc " desktop-kde.i18n.txt || { echo "::error::$loc is missing from the index"; exit 1; }
+          done
+          echo "the index names every catalogue the app can ask for"
+
+      - name: Take the pinned package the app verifies
+        run: |
+          set -euo pipefail
+          url="https://github.com/Droid-Deck/DroidDeck-Components/releases/download/${{ inputs.tag }}/desktop-kde.tar.zst"
+          curl -fL --retry 3 -o desktop-kde.tar.zst "$url"
+          stat -c '%s bytes' desktop-kde.tar.zst
+          sha256sum desktop-kde.tar.zst
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          TAG='${{ inputs.tag }}'
+          gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$TAG" --prerelease --title "$TAG (test)" \
+            --notes "Test copy: the pinned $TAG payload plus the language packs from run ${{ inputs.run }}." \
+            desktop-kde.tar.zst packs/desktop-kde.i18n.txt packs/desktop-kde-i18n-*.tar.zst
+          gh release view "$TAG" --json assets --jq '"assets \(.assets | length)"'
+          for asset in desktop-kde.i18n.txt desktop-kde-i18n-de.tar.zst desktop-kde-i18n-zh_CN.tar.zst desktop-kde.tar.zst; do
+            curl -sI -o /dev/null -w "%{http_code} %{size_download} $asset\n" -L "https://github.com/${GITHUB_REPOSITORY}/releases/download/$TAG/$asset"
+          done
