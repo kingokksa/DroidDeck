@@ -1219,6 +1219,8 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         val entry = com.droiddeck.launcher.runtime.DesktopCatalog.desktopEntry(this)
         val problem = com.droiddeck.launcher.runtime.DesktopCatalog.install(this, entry,
             progressFor(DESKTOP_LINES, entry.size / 1_000_000))
+        if (problem == null) com.droiddeck.launcher.runtime.DesktopLanguage.sync(this,
+            progressFor(DESKTOP_LINES, 0))?.let { android.util.Log.w("SessionActivity", it) }
         return problem?.let { getString(R.string.session_desktop_install_failed, it) }
     }
 
