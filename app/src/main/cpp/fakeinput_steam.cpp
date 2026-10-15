@@ -3258,7 +3258,8 @@ EXPORT int inotify_add_watch(int fd, const char *pathname, uint32_t mask) {
       pathname = fake_path;
     } else if (!strcmp(pathname, "/dev/input")) {
       pathname = fake_hook_dir();
-    } else if (!strcmp(pathname, "/dev") && fake_deck_enabled() && process_is_steam_client()) {
+    } else if (!strcmp(pathname, "/dev") && fake_deck_enabled() &&
+               (process_is_steam_client() || pad_watch_requested())) {
       std::string events = hidraw_event_dir();
       mkdir(events.c_str(), 0700);
       my_inotify_add_watch(fd, events.c_str(), mask);
