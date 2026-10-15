@@ -16,6 +16,14 @@ release in Droid-Deck/DroidDeck-Components. `release.env` pins the tag, sha256 a
 installs (`DesktopCatalog.desktopEntry`); a published tag is never replaced, so a changed package
 is a new tag and a `release.env` update.
 
+The package keeps only English catalogs. `build.sh` packs every other `usr/share/locale` directory
+as `desktop-kde-i18n-<locale>.tar.zst` and records each pack's locale, SHA-256 and size in
+`desktop-kde.i18n.txt`; the index and the packs ship in the same release. The app reads that index
+(`DesktopLanguage`) and, when the launcher's language is not English, installs the one pack and
+lets the desktop start with `LANG`/`LANGUAGE` pointing at it. `droiddeck-desktop` builds the missing
+glibc locale from the runtime's own i18n sources, the way `droiddeck-game-env` does for games.
+Another language deletes the pack we installed, and desktop removal clears it with the desktop.
+
 At run time the desktop is started by `tools/linuxfs/desktop/droiddeck-desktop` (the app stages it
 at every session): Plasma's own `startplasma-wayland`, with KWin nested in the app's compositor
 through `kwin_wayland_wrapper`. KWin composites in software (QPainter) - the Adreno node is not a
