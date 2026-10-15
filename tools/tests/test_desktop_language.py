@@ -69,6 +69,15 @@ class DesktopLanguageBuildTest(unittest.TestCase):
         self.assertIn('"desktop-kde-i18n"', source)
         self.assertIn('"usr/share/locale"', source)
 
+    def test_the_app_only_claims_the_catalogue_directories_it_wrote(self):
+        source = read(LANGUAGE_KT)
+        self.assertIn('private const val OWNED = ".droiddeck-pack"', source)
+        self.assertIn('private fun installed(root: File, tag: String, sha256: String): Boolean', source)
+        self.assertIn('private fun forget(root: File, tag: String)', source)
+        self.assertIn('if (File(dir, OWNED).isFile) FileUtils.delete(dir)', source)
+        self.assertIn('return !installed(root, wanted, have.sha256)', source)
+        self.assertIn('FileUtils.writeString(marker, pack.sha256)', source)
+
     def test_every_offered_language_has_a_catalogue_the_packages_actually_ship(self):
         source = read(APP_LANGUAGE_KT)
         supported = re.findall(r'"([^"]+)"', re.search(r'val supported: List<String> = listOf\((.*?)\n    \)',
@@ -89,9 +98,17 @@ class DesktopLanguageSessionTest(unittest.TestCase):
         self.assertIn('localedef -i', block)
         self.assertIn('cd /usr/lib/locale && localedef', block)
         self.assertIn('/usr/lib/locale/.droiddeck-locale', block)
-        self.assertIn('[ -e "$stamp" ]; then', block)
-        self.assertLess(block.index('[ -e "$stamp" ]; then'), block.index('export LANG=$name'))
+        self.assertIn('[ -e "$stamp" ] || name=', block)
+        self.assertLess(block.index('[ -e "$stamp" ] || name='), block.index('export LANG=$name'))
         self.assertIn('BL_DESKTOP_MESSAGES', block)
+
+    def test_the_desktop_tells_plasma_which_catalogue_to_use(self):
+        block = self.desktop.split('name=${BL_DESKTOP_LANG:-}', 1)[1].split('\nfind "$XDG_RUNTIME_DIR"', 1)[0]
+        self.assertIn("printf '[Formats]\\nLANG=%s\\n[Translations]\\nLANGUAGE=%s\\n'", block)
+        self.assertIn("printf '[Formats]\\nLANG=C.UTF-8\\n'", block)
+        self.assertIn('>"$HOME/.config/plasma-localerc"', block)
+        self.assertLess(block.index('export LANG=$name LANGUAGE=$messages'), block.index('plasma-localerc'))
+        self.assertIn('catalogs $(ls "$catalogs" 2>/dev/null | wc -l) files, plasmashell', block)
 
     def test_the_stamp_directory_is_the_one_the_game_locale_uses(self):
         self.assertIn('/usr/lib/locale/.droiddeck-locale', read(GAME_ENV))

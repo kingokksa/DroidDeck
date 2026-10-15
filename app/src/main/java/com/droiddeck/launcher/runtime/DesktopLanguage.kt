@@ -16,6 +16,7 @@ object DesktopLanguage {
     private const val INDEX = "desktop-kde.i18n.txt"
     private const val ARCHIVE = "desktop-kde-i18n"
     private const val LOCALES = "usr/share/locale"
+    private const val OWNED = ".droiddeck-pack"
 
     internal class Pack(val tag: String, val sha256: String)
 
@@ -48,15 +49,26 @@ object DesktopLanguage {
         return Pack(fields[0], fields[1])
     }
 
+    private fun installed(root: File, tag: String, sha256: String): Boolean {
+        val dir = directory(root, tag) ?: return false
+        val marker = File(dir, OWNED)
+        return marker.isFile && FileUtils.readString(marker)?.trim() == sha256 && File(dir, "LC_MESSAGES").isDirectory
+    }
+
     private fun keep(root: File, pack: Pack?): Boolean {
         val have = record(root)
         if (pack == null) return have == null
         if (have?.tag != pack.tag || have.sha256 != pack.sha256) return false
-        return File(root, "$LOCALES/${sanitize(pack.tag)}").isDirectory
+        return installed(root, pack.tag, pack.sha256)
     }
 
     private fun directory(root: File, tag: String): File? =
         DesktopFileRemoval.safeFile(root, "$LOCALES/${sanitize(tag)}")
+
+    private fun forget(root: File, tag: String) {
+        val dir = directory(root, tag) ?: return
+        if (File(dir, OWNED).isFile) FileUtils.delete(dir)
+    }
 
     @Synchronized
     fun sync(context: Context, listener: LinuxRuntimeInstaller.ProgressListener? = null): String? {
@@ -72,7 +84,7 @@ object DesktopLanguage {
         if (keep(root, pack)) return null
         if (pack != null) fetch(context, root, pack, listener)?.let { return it }
         val previous = record(root)
-        if (previous != null && previous.tag != (pack?.tag ?: "")) directory(root, previous.tag)?.let(FileUtils::delete)
+        if (previous != null && previous.tag != (pack?.tag ?: "")) forget(root, previous.tag)
         if (!FileUtils.writeString(File(root, STATE), pack?.let { "${it.tag} ${it.sha256}" } ?: ""))
             return context.getString(R.string.deskpkg_install_failed)
         Log.i(TAG, "desktop language: ${pack?.tag ?: "en"}")
@@ -85,7 +97,8 @@ object DesktopLanguage {
         val have = record(root)
         val wanted = wanted(context)
         if (wanted.isEmpty()) return have != null
-        return have?.tag != wanted || !File(root, "$LOCALES/${sanitize(wanted)}").isDirectory
+        if (have == null || have.tag != wanted) return true
+        return !installed(root, wanted, have.sha256)
     }
 
     private fun text(url: String): String? {
@@ -120,17 +133,19 @@ object DesktopLanguage {
             download.delete()
             return context.getString(R.string.deskpkg_checksum_mismatch)
         }
-        directory(root, pack.tag)?.let(FileUtils::delete)
+        forget(root, pack.tag)
         if (!LinuxRuntimeInstaller.extract(context, download, root, listener)) {
             download.delete()
             return context.getString(R.string.deskpkg_extract_failed)
         }
         download.delete()
+        val marker = File(root, "$LOCALES/${sanitize(pack.tag)}/$OWNED")
+        if (!FileUtils.writeString(marker, pack.sha256)) return context.getString(R.string.deskpkg_install_failed)
         return null
     }
 
     fun clear(root: File) {
-        record(root)?.let { directory(root, it.tag)?.let(FileUtils::delete) }
+        record(root)?.let { forget(root, it.tag) }
         File(root, STATE).delete()
     }
 }
