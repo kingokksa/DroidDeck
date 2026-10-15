@@ -12,6 +12,8 @@ case $target in
 esac
 
 if [ "$ui" = desktop ] && [ "${BL_DESKTOP:-}" = 1 ]; then
+  unset LANGUAGE LC_ALL
+  export LANG=C.UTF-8
   steam_root=${XDG_DATA_HOME:-${HOME:-/root}/.local/share}/Steam
   export LD_LIBRARY_PATH=$steam_root/steamrtarm64:$steam_root/steamrtarm64/panorama${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
   mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}/droiddeck"
