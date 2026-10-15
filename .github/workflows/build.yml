@@ -311,13 +311,15 @@ jobs:
         if: steps.preloads.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
+          curl -fL --retry 3 -o g++-10-multilib_10.2.1-6_amd64.deb https://snapshot.debian.org/archive/debian/20250601T000000Z/pool/main/g/gcc-10/g%2b%2b-10-multilib_10.2.1-6_amd64.deb
           docker run --rm -v "$PWD:/src" -w /src public.ecr.aws/docker/library/debian:bullseye bash -c '
             set -euo pipefail
             printf "deb http://archive.debian.org/debian bullseye main\ndeb http://archive.debian.org/debian-security bullseye-security main\n" > /etc/apt/sources.list
             apt-get -o Acquire::Check-Valid-Until=false update -qq
-            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends gcc g++ gcc-multilib g++-multilib binutils >/dev/null
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends ./g++-10-multilib_10.2.1-6_amd64.deb gcc g++ gcc-multilib g++-multilib binutils >/dev/null
             tools/linuxfs/build-x86-preloads.sh app/src/main/assets/linuxfs
           '
+          rm -f g++-10-multilib_10.2.1-6_amd64.deb
           sudo chown -R "$(id -u):$(id -g)" app/src/main/assets/linuxfs
           ls -l app/src/main/assets/linuxfs/x86_64 app/src/main/assets/linuxfs/i386
 
