@@ -288,6 +288,8 @@ def environment(env, target, tool_folder, root, window=False):
         "STEAM_COMPAT_TOOL_PATHS": tool_folder,
         "STEAM_COMPAT_SHADER_PATH": os.path.join(target.library, "steamapps", "shadercache", target.appid),
     })
+    if env.get("FAKE_EVDEV_DECK"):
+        env["FAKE_EVDEV_PAD_WATCH"] = "1"
     number = int(target.appid)
     if number < STEAM_APP_LIMIT:
         env.update(SteamAppId=target.appid, SteamGameId=target.appid, SteamOverlayGameId=target.appid,
