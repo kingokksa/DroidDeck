@@ -18,8 +18,10 @@ object DesktopLanguage {
     private const val LOCALES = "usr/share/locale"
     private const val OWNED = ".droiddeck-pack"
     private const val ATTEMPTS = 3
-    private const val TIMEOUT_MS = 120_000
+    private const val PREPARE_WAIT_MS = 75_000L
     private const val COOLDOWN_MS = 300_000
+
+    private val lock = java.util.concurrent.locks.ReentrantLock()
 
     @Volatile
     private var failingUntil = 0L
@@ -76,20 +78,22 @@ object DesktopLanguage {
         if (File(dir, OWNED).isFile) FileUtils.delete(dir)
     }
 
-    @Synchronized
-    fun sync(context: Context, listener: LinuxRuntimeInstaller.ProgressListener? = null): String? {
-        if (System.currentTimeMillis() < failingUntil) return context.getString(R.string.user_apps_download_failed)
-        return run(context, listener, ATTEMPTS)
-    }
+    fun sync(context: Context, listener: LinuxRuntimeInstaller.ProgressListener? = null): String? =
+        guarded(context, listener, ATTEMPTS, 0)
 
-    @Synchronized
     fun prepare(context: Context, listener: LinuxRuntimeInstaller.ProgressListener? = null): String? =
-        run(context, listener, 1)
+        guarded(context, listener, 1, PREPARE_WAIT_MS)
 
-    private fun run(context: Context, listener: LinuxRuntimeInstaller.ProgressListener?, attempts: Int): String? {
-        val problem = install(context, listener, attempts)
-        failingUntil = if (problem == null) 0L else System.currentTimeMillis() + COOLDOWN_MS
-        return problem
+    private fun guarded(context: Context, listener: LinuxRuntimeInstaller.ProgressListener?, attempts: Int, waitMs: Long): String? {
+        if (!runCatching { lock.tryLock(waitMs, java.util.concurrent.TimeUnit.MILLISECONDS) }.getOrDefault(false)) return null
+        try {
+            if (System.currentTimeMillis() < failingUntil) return null
+            val problem = install(context, listener, attempts)
+            failingUntil = if (problem == null) 0L else System.currentTimeMillis() + COOLDOWN_MS
+            return problem
+        } finally {
+            lock.unlock()
+        }
     }
 
     private fun install(context: Context, listener: LinuxRuntimeInstaller.ProgressListener?, attempts: Int): String? {
@@ -124,7 +128,7 @@ object DesktopLanguage {
 
     private fun text(url: String, attempts: Int): String? {
         repeat(attempts) { attempt ->
-            Downloader.downloadString(url, TIMEOUT_MS)?.takeIf { it.isNotBlank() }?.let { return it }
+            Downloader.downloadString(url)?.takeIf { it.isNotBlank() }?.let { return it }
             if (attempt < attempts - 1) runCatching { Thread.sleep(2_000L * (attempt + 1)) }
         }
         return null
@@ -142,7 +146,7 @@ object DesktopLanguage {
         val name = "$ARCHIVE-${sanitize(pack.tag)}.tar.zst"
         val download = File(context.cacheDir, name)
         val ok = retry(attempts) {
-            Downloader.downloadFile(packUrl(pack.tag), download, true, TIMEOUT_MS) { fraction ->
+            Downloader.downloadFile(packUrl(pack.tag), download, true) { fraction ->
                 listener?.onProgress(LinuxRuntimeInstaller.Step.DOWNLOADING, name, if (fraction < 0) -1 else Math.round(fraction * 100f))
             }
         }

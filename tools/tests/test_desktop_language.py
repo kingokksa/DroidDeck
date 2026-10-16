@@ -130,19 +130,22 @@ class DesktopLanguageSessionTest(unittest.TestCase):
         self.assertIn('AppLanguage.linuxLocale(AppLanguage.selectedTag(context))', language)
         self.assertIn('AppLanguage.desktopTag(AppLanguage.selectedTag(context))', language)
 
-    def test_the_packs_are_fetched_with_a_timeout_the_link_can_meet(self):
+    def test_the_packs_are_fetched_through_the_source_fallback(self):
         language = read(LANGUAGE_KT)
-        self.assertIn('Downloader.downloadString(url, TIMEOUT_MS)', language)
-        self.assertIn('Downloader.downloadFile(packUrl(pack.tag), download, true, TIMEOUT_MS)', language)
-        self.assertIn('private const val TIMEOUT_MS = 120_000', language)
+        self.assertIn('Downloader.downloadString(url)', language)
+        self.assertIn('Downloader.downloadFile(packUrl(pack.tag), download, true)', language)
         self.assertIn('private const val ATTEMPTS = 3', language)
         self.assertIn('private const val COOLDOWN_MS = 300_000', language)
         self.assertIn('if (!ok) return context.getString(R.string.user_apps_download_failed)', language)
         downloader = read(DOWNLOADER)
-        self.assertIn('public static String downloadString(String url, int timeoutMs)', downloader)
-        self.assertIn('boolean downloadFile(String url, File destination, boolean resume, int timeoutMs,', downloader)
-        self.assertIn('private static HttpURLConnection open(String url, int timeoutMs)', downloader)
-        self.assertIn('connection.setConnectTimeout(timeoutMs)', downloader)
+        self.assertIn('DownloadSource.INSTANCE.candidates(url)', downloader)
+        self.assertIn('boolean downloadFile(String url, File destination, boolean resume,', downloader)
+
+    def test_the_launch_never_queues_behind_a_running_sync(self):
+        language = read(LANGUAGE_KT)
+        self.assertIn('private const val PREPARE_WAIT_MS = 75_000L', language)
+        self.assertIn('guarded(context, listener, 1, PREPARE_WAIT_MS)', language)
+        self.assertIn('lock.tryLock(waitMs', language)
 
     def test_the_launcher_retries_the_sync_every_time_it_comes_back(self):
         resume = read(MAIN_ACTIVITY).split('override fun onResume()', 1)[1].split('override fun onStart()', 1)[0]
@@ -155,7 +158,7 @@ class DesktopLanguageSessionTest(unittest.TestCase):
         self.assertLess(session.index('if (!catalog.desktopInstalled(this))'), session.index('DesktopLanguage.prepare'))
         language = read(LANGUAGE_KT)
         self.assertIn('fun prepare(context: Context, listener: LinuxRuntimeInstaller.ProgressListener? = null): String? =', language)
-        self.assertIn('run(context, listener, 1)', language)
+        self.assertIn('guarded(context, listener, 1, PREPARE_WAIT_MS)', language)
 
 
 if __name__ == '__main__':
