@@ -128,4 +128,29 @@ object AppLanguage {
         "zh-HK" -> "繁體中文（香港）"
         else -> Locale.forLanguageTag(tag).let { it.getDisplayName(it) }
     }
+
+    fun selectedTag(context: Context): String = supportedTag(effective(context)) ?: ""
+
+    fun desktopTag(tag: String): String = when (tag) {
+        "es-419" -> "es"
+        "pt-PT" -> "pt"
+        "zh-CN" -> "zh_CN"
+        "zh-TW" -> "zh_TW"
+        "zh-HK" -> "zh_TW"
+        else -> tag.replace('-', '_')
+    }
+
+    fun linuxLocale(tag: String): String? = linuxLocales[tag]
+
+    private val linuxLocales = mapOf(
+        "id" to "id_ID.UTF-8", "ms" to "ms_MY.UTF-8", "cs" to "cs_CZ.UTF-8",
+        "da" to "da_DK.UTF-8", "de" to "de_DE.UTF-8", "es" to "es_ES.UTF-8", "es-419" to "es_MX.UTF-8",
+        "fr" to "fr_FR.UTF-8", "it" to "it_IT.UTF-8", "hu" to "hu_HU.UTF-8", "nl" to "nl_NL.UTF-8",
+        "nb" to "nb_NO.UTF-8", "pl" to "pl_PL.UTF-8", "pt-BR" to "pt_BR.UTF-8", "pt-PT" to "pt_PT.UTF-8",
+        "ro" to "ro_RO.UTF-8", "fi" to "fi_FI.UTF-8", "sv" to "sv_SE.UTF-8", "vi" to "vi_VN.UTF-8",
+        "tr" to "tr_TR.UTF-8", "el" to "el_GR.UTF-8", "bg" to "bg_BG.UTF-8", "ru" to "ru_RU.UTF-8",
+        "uk" to "uk_UA.UTF-8", "ar" to "ar_EG.UTF-8", "hi" to "hi_IN.UTF-8", "th" to "th_TH.UTF-8",
+        "ja" to "ja_JP.UTF-8", "ko" to "ko_KR.UTF-8", "zh-CN" to "zh_CN.UTF-8", "zh-TW" to "zh_TW.UTF-8",
+        "zh-HK" to "zh_HK.UTF-8",
+    )
 }

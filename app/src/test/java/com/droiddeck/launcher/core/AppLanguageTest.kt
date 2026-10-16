@@ -46,6 +46,28 @@ class AppLanguageTest {
         assertNull(tag("nn-NO"))
     }
 
+    private val desktopCatalogues = setOf(
+        "ar", "bg", "cs", "da", "de", "el", "es", "fi", "fr", "hi", "hu", "id", "it", "ja", "ko",
+        "ms", "nb", "nl", "pl", "pt", "pt_BR", "ro", "ru", "sv", "th", "tr", "uk", "vi", "zh_CN", "zh_TW",
+    )
+
+    @Test fun everyTranslatedLanguageReachesADesktopCatalogue() {
+        AppLanguage.supported.forEach {
+            val catalogue = AppLanguage.desktopTag(it)
+            if (it == "en") assertEquals("en", catalogue) else assertTrue(it, catalogue in desktopCatalogues)
+        }
+    }
+
+    @Test fun englishKeepsTheSessionLocaleAndEveryOtherLanguageGetsOne() {
+        assertNull(AppLanguage.linuxLocale("en"))
+        AppLanguage.supported.filter { it != "en" }.forEach {
+            val locale = AppLanguage.linuxLocale(it)
+            assertTrue(it, locale != null && locale.endsWith(".UTF-8"))
+        }
+        assertEquals("zh_HK.UTF-8", AppLanguage.linuxLocale("zh-HK"))
+        assertEquals("es_MX.UTF-8", AppLanguage.linuxLocale("es-419"))
+    }
+
     @Test fun everyLanguageShipsStringsAndIsOfferedToAndroid() {
         assertEquals(AppLanguage.supported.toSet() - "en", folders.keys)
         val res = File("src/main/res")
