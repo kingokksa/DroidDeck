@@ -707,6 +707,7 @@ class MainActivity : ComponentActivity() {
                         onLanguage = { tag ->
                             if (tag != com.droiddeck.launcher.core.AppLanguage.chosen(this)) {
                                 com.droiddeck.launcher.core.AppLanguage.setChosen(this, tag)
+                                syncDesktopLanguage()
                                 recreate()
                             }
                         },
@@ -976,6 +977,7 @@ class MainActivity : ComponentActivity() {
         decky.deckySupervisor = DeckyManager.supervisorEnabled(this)
         refreshAddedGames()
         if (catalog == null) loadDesktopCatalog()
+        syncDesktopLanguage()
         if (!busy) Thread({ checkCatalog() }, "catalog").start()
     }
 
@@ -1185,6 +1187,14 @@ class MainActivity : ComponentActivity() {
         packageRows = catalog?.map { PackageRow(it.id, it.kind, it.notes) }
         desktopInstalled = DesktopCatalog.desktopInstalled(this)
         desktopPresent = DesktopCatalog.desktopPresent(this)
+        syncDesktopLanguage()
+    }
+
+    private fun syncDesktopLanguage() {
+        Thread({
+            if (!com.droiddeck.launcher.runtime.DesktopLanguage.needed(this)) return@Thread
+            com.droiddeck.launcher.runtime.DesktopLanguage.sync(this)?.let { Log.w(TAG, it) }
+        }, "desktop-language").start()
     }
 
     private fun launchProgram(path: String) {

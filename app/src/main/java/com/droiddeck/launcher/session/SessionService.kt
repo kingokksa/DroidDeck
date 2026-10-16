@@ -511,6 +511,8 @@ class SessionService : Service() {
             com.droiddeck.launcher.core.AppLanguage.effective(this),
             com.droiddeck.launcher.core.AppLanguage.system(this).country,
         ))
+        guest.add("BL_DESKTOP_LANG=" + com.droiddeck.launcher.runtime.DesktopLanguage.locale(this))
+        guest.add("BL_DESKTOP_MESSAGES=" + com.droiddeck.launcher.runtime.DesktopLanguage.wanted(this))
         guest.add("TZ=" + java.util.TimeZone.getDefault().id)
         guest.add("XDG_RUNTIME_DIR=" + LinuxRuntime.GUEST_RUNTIME_DIR)
         guest.add("XDG_SESSION_TYPE=wayland")

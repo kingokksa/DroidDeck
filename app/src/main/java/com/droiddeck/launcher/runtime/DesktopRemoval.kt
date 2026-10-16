@@ -63,6 +63,7 @@ internal object DesktopRemoval {
                 if (!target.delete()) error("Could not remove $path")
             }
         }
+        DesktopLanguage.clear(root)
         if (!pending.delete()) error("Could not finish desktop removal")
         Log.i("DesktopRemoval", "KDE: $result")
         listener.onProgress(context.getString(R.string.desktop_removed), 100)

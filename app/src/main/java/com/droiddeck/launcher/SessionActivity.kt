@@ -410,7 +410,8 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         if (!SessionState.running) {
             val needRuntime = com.droiddeck.launcher.runtime.LinuxRuntimeInstaller.installedVersion(this) == null
             val needDesktop = intent.getStringExtra(SessionService.EXTRA_MODE) == SessionService.MODE_DESKTOP &&
-                !com.droiddeck.launcher.runtime.DesktopCatalog.desktopInstalled(this)
+                (!com.droiddeck.launcher.runtime.DesktopCatalog.desktopInstalled(this) ||
+                    com.droiddeck.launcher.runtime.DesktopLanguage.needed(this))
             val needProton = (intent.getStringExtra(SessionService.EXTRA_MODE) ?: SessionService.MODE_STEAM) == SessionService.MODE_STEAM &&
                 com.droiddeck.launcher.runtime.DesktopCatalog.protonSeedNeeded(this)
             if (needRuntime || needDesktop || needProton) installThenStart(needRuntime, needDesktop, needProton)
@@ -1192,11 +1193,17 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
     }
 
     private fun installDesktop(): String? {
+        val catalog = com.droiddeck.launcher.runtime.DesktopCatalog
+        if (!catalog.desktopInstalled(this)) {
+            uiHandler.post { loading.percent = -1; loading.say(getString(DESKTOP_LINES.downloading), DESKTOP_LINES.topic, readable = true) }
+            val entry = catalog.desktopEntry(this)
+            val problem = catalog.install(this, entry, progressFor(DESKTOP_LINES, entry.size / 1_000_000))
+            if (problem != null) return getString(R.string.session_desktop_install_failed, problem)
+        }
         uiHandler.post { loading.percent = -1; loading.say(getString(DESKTOP_LINES.downloading), DESKTOP_LINES.topic, readable = true) }
-        val entry = com.droiddeck.launcher.runtime.DesktopCatalog.desktopEntry(this)
-        val problem = com.droiddeck.launcher.runtime.DesktopCatalog.install(this, entry,
-            progressFor(DESKTOP_LINES, entry.size / 1_000_000))
-        return problem?.let { getString(R.string.session_desktop_install_failed, it) }
+        com.droiddeck.launcher.runtime.DesktopLanguage.prepare(this, progressFor(DESKTOP_LINES, 0))
+            ?.let { android.util.Log.w("SessionActivity", it) }
+        return null
     }
 
     private fun installProton(): String? {
