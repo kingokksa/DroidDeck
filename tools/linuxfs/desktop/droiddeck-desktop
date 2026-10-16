@@ -20,6 +20,30 @@ if [ -n "${BL_DEBUG_DIR:-}" ]; then
   exec >>"$BL_DEBUG_DIR/desktop.log" 2>&1
   echo "== droiddeck-desktop $(date -u '+%Y-%m-%d %H:%M:%S UTC') ${BL_WIDTH:-1280}x${BL_HEIGHT:-720}"
 fi
+name=${BL_DESKTOP_LANG:-}
+stamp=
+if [ -n "$name" ]; then
+  stamp=/usr/lib/locale/.droiddeck-locale/$name
+  if [ ! -e "$stamp" ]; then
+    enc=${name#*.}
+    [ "$enc" = "$name" ] && enc=UTF-8
+    ( cd /usr/lib/locale && localedef -i "${name%%.*}" -f "$enc" "$name" ) >/dev/null 2>&1 && { mkdir -p "${stamp%/*}" && : >"$stamp"; }
+  fi
+fi
+[ -e "$stamp" ] || name=
+messages=${name:+${BL_DESKTOP_MESSAGES:-${name%%.*}}}
+mkdir -p "$HOME/.config"
+if [ -n "$name" ]; then
+  export LANG=$name LANGUAGE=$messages
+  printf '[Formats]\nLANG=%s\n[Translations]\nLANGUAGE=%s\n' "$name" "$messages" >"$HOME/.config/plasma-localerc"
+  catalogs=/usr/share/locale/$messages/LC_MESSAGES
+  echo "== droiddeck-desktop: locale $LANG $LANGUAGE, $messages catalogs $(ls "$catalogs" 2>/dev/null | wc -l) files, plasmashell $([ -e "$catalogs/plasmashell.mo" ] && echo present || echo missing)"
+else
+  if [ -n "${BL_DESKTOP_LANG:-}" ]; then
+    echo "== droiddeck-desktop: ${BL_DESKTOP_LANG} locale data could not be built; staying on C.UTF-8"
+  fi
+  [ -e "$HOME/.config/plasma-localerc" ] && printf '[Formats]\nLANG=C.UTF-8\n' >"$HOME/.config/plasma-localerc"
+fi
 find "$XDG_RUNTIME_DIR" -mindepth 1 -maxdepth 1 ! -name 'wayland-0*' ! -name 'keymap.xkb' -exec rm -rf {} + 2>/dev/null
 chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null
 mkdir -p /tmp/.X11-unix /tmp/.ICE-unix && chmod 1777 /tmp/.X11-unix /tmp/.ICE-unix 2>/dev/null
