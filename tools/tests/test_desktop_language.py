@@ -20,6 +20,7 @@ LANGUAGE_KT = ROOT / 'app/src/main/java/com/droiddeck/launcher/runtime/DesktopLa
 APP_LANGUAGE_KT = ROOT / 'app/src/main/java/com/droiddeck/launcher/core/AppLanguage.kt'
 DOWNLOADER = ROOT / 'app/src/main/java/com/droiddeck/launcher/core/Downloader.java'
 MAIN_ACTIVITY = ROOT / 'app/src/main/java/com/droiddeck/launcher/MainActivity.kt'
+SESSION_ACTIVITY = ROOT / 'app/src/main/java/com/droiddeck/launcher/SessionActivity.kt'
 
 CATALOGUES = {
     'ar', 'bg', 'cs', 'da', 'de', 'el', 'es', 'fi', 'fr', 'hi', 'hu', 'id', 'it', 'ja', 'ko', 'ms',
@@ -146,6 +147,15 @@ class DesktopLanguageSessionTest(unittest.TestCase):
     def test_the_launcher_retries_the_sync_every_time_it_comes_back(self):
         resume = read(MAIN_ACTIVITY).split('override fun onResume()', 1)[1].split('override fun onStart()', 1)[0]
         self.assertIn('syncDesktopLanguage()', resume)
+
+    def test_the_desktop_checks_its_translations_before_it_starts(self):
+        session = read(SESSION_ACTIVITY)
+        self.assertIn('com.droiddeck.launcher.runtime.DesktopLanguage.needed(this)', session)
+        self.assertIn('com.droiddeck.launcher.runtime.DesktopLanguage.prepare(this, progressFor(DESKTOP_LINES, 0))', session)
+        self.assertLess(session.index('if (!catalog.desktopInstalled(this))'), session.index('DesktopLanguage.prepare'))
+        language = read(LANGUAGE_KT)
+        self.assertIn('fun prepare(context: Context, listener: LinuxRuntimeInstaller.ProgressListener? = null): String? =', language)
+        self.assertIn('run(context, listener, 1)', language)
 
 
 if __name__ == '__main__':

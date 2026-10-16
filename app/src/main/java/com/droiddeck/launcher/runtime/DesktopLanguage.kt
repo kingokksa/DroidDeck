@@ -79,23 +79,31 @@ object DesktopLanguage {
     @Synchronized
     fun sync(context: Context, listener: LinuxRuntimeInstaller.ProgressListener? = null): String? {
         if (System.currentTimeMillis() < failingUntil) return context.getString(R.string.user_apps_download_failed)
-        val problem = install(context, listener)
+        return run(context, listener, ATTEMPTS)
+    }
+
+    @Synchronized
+    fun prepare(context: Context, listener: LinuxRuntimeInstaller.ProgressListener? = null): String? =
+        run(context, listener, 1)
+
+    private fun run(context: Context, listener: LinuxRuntimeInstaller.ProgressListener?, attempts: Int): String? {
+        val problem = install(context, listener, attempts)
         failingUntil = if (problem == null) 0L else System.currentTimeMillis() + COOLDOWN_MS
         return problem
     }
 
-    private fun install(context: Context, listener: LinuxRuntimeInstaller.ProgressListener?): String? {
+    private fun install(context: Context, listener: LinuxRuntimeInstaller.ProgressListener?, attempts: Int): String? {
         val root = LinuxRuntime.rootDir(context)
         if (!DesktopCatalog.desktopInstalled(context)) return null
         val wanted = wanted(context)
         val pack = if (wanted.isEmpty()) null else {
-            val index = text(indexUrl())
+            val index = text(indexUrl(), attempts)
                 ?: return context.getString(R.string.user_apps_download_failed)
             parse(index)[wanted]
         }
         if (pack == null && wanted.isNotEmpty()) Log.w(TAG, "the desktop has no $wanted catalogs")
         if (keep(root, pack)) return null
-        if (pack != null) fetch(context, root, pack, listener)?.let { return it }
+        if (pack != null) fetch(context, root, pack, listener, attempts)?.let { return it }
         val previous = record(root)
         if (previous != null && previous.tag != (pack?.tag ?: "")) forget(root, previous.tag)
         if (!FileUtils.writeString(File(root, STATE), pack?.let { "${it.tag} ${it.sha256}" } ?: ""))
@@ -114,26 +122,26 @@ object DesktopLanguage {
         return !installed(root, wanted, have.sha256)
     }
 
-    private fun text(url: String): String? {
-        repeat(ATTEMPTS) { attempt ->
+    private fun text(url: String, attempts: Int): String? {
+        repeat(attempts) { attempt ->
             Downloader.downloadString(url, TIMEOUT_MS)?.takeIf { it.isNotBlank() }?.let { return it }
-            if (attempt < ATTEMPTS - 1) runCatching { Thread.sleep(2_000L * (attempt + 1)) }
+            if (attempt < attempts - 1) runCatching { Thread.sleep(2_000L * (attempt + 1)) }
         }
         return null
     }
 
-    private fun retry(step: () -> Boolean): Boolean {
-        repeat(ATTEMPTS) { attempt ->
+    private fun retry(attempts: Int, step: () -> Boolean): Boolean {
+        repeat(attempts) { attempt ->
             if (step()) return true
-            if (attempt < ATTEMPTS - 1) runCatching { Thread.sleep(2_000L * (attempt + 1)) }
+            if (attempt < attempts - 1) runCatching { Thread.sleep(2_000L * (attempt + 1)) }
         }
         return false
     }
 
-    private fun fetch(context: Context, root: File, pack: Pack, listener: LinuxRuntimeInstaller.ProgressListener?): String? {
+    private fun fetch(context: Context, root: File, pack: Pack, listener: LinuxRuntimeInstaller.ProgressListener?, attempts: Int): String? {
         val name = "$ARCHIVE-${sanitize(pack.tag)}.tar.zst"
         val download = File(context.cacheDir, name)
-        val ok = retry {
+        val ok = retry(attempts) {
             Downloader.downloadFile(packUrl(pack.tag), download, true, TIMEOUT_MS) { fraction ->
                 listener?.onProgress(LinuxRuntimeInstaller.Step.DOWNLOADING, name, if (fraction < 0) -1 else Math.round(fraction * 100f))
             }
