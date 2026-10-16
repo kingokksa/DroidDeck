@@ -511,6 +511,7 @@ class MainActivity : ComponentActivity() {
         orientation = SessionPrefs.orientation(this)
         requestedOrientation = orientation
         launcherFullscreen = SessionPrefs.launcherFullscreen(this)
+        com.droiddeck.launcher.core.DownloadSource.probe()
         animationsEnabled = SessionPrefs.animationsEnabled(this)
         gameStoresEnabled = SessionPrefs.gameStoresEnabled(this)
         gameStoresSpeedTier = SessionPrefs.gameStoresSpeedTier(this)

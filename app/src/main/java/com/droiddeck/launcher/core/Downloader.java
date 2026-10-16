@@ -11,66 +11,78 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 public final class Downloader {
     private static final String TAG = "Downloader";
-    private static final int TIMEOUT_MS = 30_000;
+    private static final int CONNECT_TIMEOUT_MS = 10_000;
+    private static final int STALL_TIMEOUT_MS = 15_000;
+    private static final int HTTP_RANGE_NOT_SATISFIABLE = 416;
 
     private Downloader() {}
 
     public static String downloadString(String url) {
-        return downloadString(url, TIMEOUT_MS);
-    }
-
-    public static String downloadString(String url, int timeoutMs) {
-        HttpURLConnection connection = null;
-        try {
-            connection = open(url, timeoutMs);
-            if (connection.getResponseCode() / 100 != 2) {
-                Log.w(TAG, url + " -> HTTP " + connection.getResponseCode());
-                return null;
+        List<String> sources = DownloadSource.INSTANCE.candidates(url);
+        for (int i = 0; i < sources.size(); i++) {
+            if (i > 0) Log.i(TAG, "retrying " + url + " via " + sources.get(i));
+            Fetch fetch = fetch(sources.get(i));
+            if (fetch.body != null) {
+                DownloadSource.INSTANCE.succeeded(sources.get(i));
+                return fetch.body;
             }
-            try (InputStream in = connection.getInputStream();
-                 ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-                FileUtils.copy(in, out);
-                return new String(out.toByteArray(), StandardCharsets.UTF_8);
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "GET " + url, e);
-            return null;
-        } finally {
-            if (connection != null) connection.disconnect();
+            if (fetch.fatal) return null;
         }
+        DownloadSource.INSTANCE.failed();
+        return null;
     }
 
     public static boolean downloadFile(String url, File destination, boolean resume,
                                        java.util.function.Consumer<Float> progress) {
-        return downloadFile(url, destination, resume, TIMEOUT_MS, progress);
+        List<String> sources = DownloadSource.INSTANCE.candidates(url);
+        for (int i = 0; i < sources.size(); i++) {
+            if (i > 0) Log.i(TAG, "retrying " + url + " via " + sources.get(i));
+            Outcome outcome = attempt(sources.get(i), destination, resume, progress);
+            if (outcome == Outcome.DONE) {
+                DownloadSource.INSTANCE.succeeded(sources.get(i));
+                return true;
+            }
+            if (outcome == Outcome.FATAL) return false;
+        }
+        DownloadSource.INSTANCE.failed();
+        return false;
     }
 
-    public static boolean downloadFile(String url, File destination, boolean resume, int timeoutMs,
-                                       java.util.function.Consumer<Float> progress) {
+    private enum Outcome { DONE, RETRY, FATAL }
+
+    private static Outcome attempt(String url, File destination, boolean resume,
+                                   java.util.function.Consumer<Float> progress) {
         HttpURLConnection connection = null;
         long have = resume && destination.isFile() ? destination.length() : 0;
         try {
-            connection = open(url, timeoutMs);
+            connection = open(url, STALL_TIMEOUT_MS);
             if (have > 0) connection.setRequestProperty("Range", "bytes=" + have + "-");
             int code = connection.getResponseCode();
+            if (have > 0 && code == HTTP_RANGE_NOT_SATISFIABLE) {
+                connection.disconnect();
+                destination.delete();
+                return attempt(url, destination, false, progress);
+            }
             boolean appending = code == HttpURLConnection.HTTP_PARTIAL;
             if (appending && !rangeStartsAt(connection.getHeaderField("Content-Range"), have)) {
                 // A 206 that does not begin where the kept bytes end would corrupt the file if appended.
                 connection.disconnect();
                 destination.delete();
-                return downloadFile(url, destination, false, timeoutMs, progress);
+                return attempt(url, destination, false, progress);
             }
             if (code / 100 != 2) {
-                if (have > 0) {
-                    connection.disconnect();
-                    destination.delete();
-                    return downloadFile(url, destination, false, timeoutMs, progress);
-                }
                 Log.w(TAG, url + " -> HTTP " + code);
-                return false;
+                return code == HttpURLConnection.HTTP_NOT_FOUND || code == HttpURLConnection.HTTP_GONE
+                        ? Outcome.FATAL : Outcome.RETRY;
+            }
+            if (!appending && have > 0) {
+                connection.disconnect();
+                destination.delete();
+                return attempt(url, destination, false, progress);
             }
             if (!appending) have = 0;
             long length = connection.getContentLengthLong();
@@ -92,11 +104,12 @@ public final class Downloader {
                     }
                 }
             }
+            if (total > 0 && written < total) return Outcome.RETRY;
             if (progress != null) progress.accept(1f);
-            return total <= 0 || written >= total;
+            return Outcome.DONE;
         } catch (Exception e) {
             Log.w(TAG, "download " + url, e);
-            return false;
+            return Outcome.RETRY;
         } finally {
             if (connection != null) connection.disconnect();
         }
@@ -109,10 +122,42 @@ public final class Downloader {
         return m.matches() && Long.parseLong(m.group(1)) == start;
     }
 
-    private static HttpURLConnection open(String url, int timeoutMs) throws java.io.IOException {
+    private static final class Fetch {
+        final String body;
+        final boolean fatal;
+
+        Fetch(String body, boolean fatal) {
+            this.body = body;
+            this.fatal = fatal;
+        }
+    }
+
+    private static Fetch fetch(String url) {
+        HttpURLConnection connection = null;
+        try {
+            connection = open(url, STALL_TIMEOUT_MS);
+            int code = connection.getResponseCode();
+            if (code / 100 != 2) {
+                Log.w(TAG, url + " -> HTTP " + code);
+                return new Fetch(null, code == HttpURLConnection.HTTP_NOT_FOUND || code == HttpURLConnection.HTTP_GONE);
+            }
+            try (InputStream in = connection.getInputStream();
+                 ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                FileUtils.copy(in, out);
+                return new Fetch(new String(out.toByteArray(), StandardCharsets.UTF_8), false);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "GET " + url, e);
+            return new Fetch(null, false);
+        } finally {
+            if (connection != null) connection.disconnect();
+        }
+    }
+
+    private static HttpURLConnection open(String url, int readTimeoutMs) throws java.io.IOException {
         HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-        connection.setConnectTimeout(timeoutMs);
-        connection.setReadTimeout(timeoutMs);
+        connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
+        connection.setReadTimeout(readTimeoutMs);
         connection.setInstanceFollowRedirects(true);
         connection.setRequestProperty("User-Agent", "DroidDeck-Android");
         return connection;
