@@ -2382,7 +2382,7 @@
     <string name="storage_clean_up_lede">Hier raakt niets geïnstalleerde games of lopende downloads aan.</string>
     <string name="storage_nothing_to_clean">Er is nu niets om op te ruimen.</string>
     <string name="storage_selected">Geselecteerd: %1$s · %2$s → %3$s vrij</string>
-    <string name="storage_cleaning">Opruimen…</string>
+    <string name="storage_cleaning">Bezig met opruimen…</string>
     <string name="storage_free_button">%1$s vrijmaken</string>
     <string name="storage_freed">%1$s vrijgemaakt.</string>
     <string name="storage_item_runtimes">Ongebruikte Steam-runtimes en Proton</string>

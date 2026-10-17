@@ -2355,7 +2355,7 @@
     <string name="storage_other_apps">Andra Android-appar</string>
     <string name="storage_safe_now">Kan frigöras nu</string>
     <string name="storage_safe_hint">Oanvända körmiljöer, rester, gamla loggar</string>
-    <string name="storage_clean_up">Rensar…</string>
+    <string name="storage_clean_up">Rensa…</string>
     <string name="storage_session_running">Stoppa sessionen för att rensa eller ta bort något. Storlekarna syns fortfarande.</string>
     <string name="storage_where">Vart det tar vägen</string>
     <string name="storage_games">Steam-spel</string>

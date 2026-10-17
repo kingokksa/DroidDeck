@@ -2146,7 +2146,7 @@
     <string name="gpu_mode_mix_short">混合</string>
     <string name="gpu_src_auto">自動</string>
     <string name="gpu_src_pair">配對</string>
-    <string name="gpu_src_bundle">內建</string>
+    <string name="gpu_src_bundle">套件組合</string>
     <string name="gpu_src_chosen">已選</string>
     <string name="gpu_src_by_gpu">依 GPU</string>
     <string name="gpu_src_default">預設</string>
@@ -2166,7 +2166,7 @@
     <string name="gpu_pair_title">選擇組合</string>
     <string name="gpu_pair_hint">組合會同時設定顯示驅動程式與執行環境驅動程式。</string>
     <string name="gpu_mix_title">分別選擇驅動程式</string>
-    <string name="gpu_mix_hint">內建組合包會同時填入兩者。顯示驅動程式的變更在重新啟動後生效，執行環境驅動程式在下次工作階段生效。</string>
+    <string name="gpu_mix_hint">套件組合會同時填入兩者。顯示驅動程式的變更在重新啟動後生效，執行環境驅動程式在下次工作階段生效。</string>
     <string name="gpu_change_display">更換顯示驅動程式</string>
     <string name="gpu_change_runtime">更換執行環境驅動程式</string>
     <string name="gpu_autos_pick">自動選擇</string>

@@ -2382,7 +2382,7 @@
     <string name="storage_clean_up_lede">Τίποτα εδώ δεν αγγίζει εγκατεστημένα παιχνίδια ή λήψεις σε εξέλιξη.</string>
     <string name="storage_nothing_to_clean">Δεν υπάρχει κάτι για καθάρισμα τώρα.</string>
     <string name="storage_selected">Επιλεγμένα: %1$s · %2$s → %3$s θα ελευθερωθούν</string>
-    <string name="storage_cleaning">Καθαρισμός…</string>
+    <string name="storage_cleaning">Γίνεται καθαρισμός…</string>
     <string name="storage_free_button">Ελευθέρωση %1$s</string>
     <string name="storage_freed">Ελευθερώθηκαν %1$s.</string>
     <string name="storage_item_runtimes">Αχρησιμοποίητα περιβάλλοντα Steam και Proton</string>

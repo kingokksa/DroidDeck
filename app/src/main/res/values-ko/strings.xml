@@ -2146,7 +2146,7 @@
     <string name="gpu_mode_mix_short">개별</string>
     <string name="gpu_src_auto">자동</string>
     <string name="gpu_src_pair">조합</string>
-    <string name="gpu_src_bundle">내장</string>
+    <string name="gpu_src_bundle">번들</string>
     <string name="gpu_src_chosen">선택됨</string>
     <string name="gpu_src_by_gpu">GPU별</string>
     <string name="gpu_src_default">기본</string>
@@ -2166,7 +2166,7 @@
     <string name="gpu_pair_title">조합 선택</string>
     <string name="gpu_pair_hint">조합은 디스플레이 드라이버와 런타임 드라이버를 함께 설정합니다.</string>
     <string name="gpu_mix_title">드라이버 개별 선택</string>
-    <string name="gpu_mix_hint">내장 패키지는 둘 다 함께 채웁니다. 디스플레이 드라이버 변경은 다시 시작한 뒤, 런타임 드라이버는 다음 세션에 적용됩니다.</string>
+    <string name="gpu_mix_hint">번들은 두 슬롯을 함께 채웁니다. 디스플레이 드라이버 변경은 다시 시작한 뒤, 런타임 드라이버는 다음 세션에 적용됩니다.</string>
     <string name="gpu_change_display">디스플레이 드라이버 변경</string>
     <string name="gpu_change_runtime">런타임 드라이버 변경</string>
     <string name="gpu_autos_pick">자동 선택</string>

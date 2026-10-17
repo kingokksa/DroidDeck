@@ -2380,7 +2380,7 @@
     <string name="storage_other_apps">Alte aplicații Android</string>
     <string name="storage_safe_now">Se poate elibera acum</string>
     <string name="storage_safe_hint">Medii de execuție nefolosite, resturi, jurnale vechi</string>
-    <string name="storage_clean_up">Se curăță…</string>
+    <string name="storage_clean_up">Curăță…</string>
     <string name="storage_session_running">Oprește sesiunea pentru a curăța sau șterge ceva. Dimensiunile rămân vizibile.</string>
     <string name="storage_where">Unde ajunge</string>
     <string name="storage_games">Jocuri Steam</string>

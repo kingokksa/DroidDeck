@@ -2355,7 +2355,7 @@
     <string name="storage_other_apps">दूसरे Android ऐप</string>
     <string name="storage_safe_now">अभी खाली की जा सकती है</string>
     <string name="storage_safe_hint">अप्रयुक्त रनटाइम, बचे अवशेष, पुराने लॉग</string>
-    <string name="storage_clean_up">साफ़ कर रहे हैं…</string>
+    <string name="storage_clean_up">साफ़ करें…</string>
     <string name="storage_session_running">साफ़ करने या कुछ हटाने के लिए सेशन रोकें। आकार दिखते रहेंगे।</string>
     <string name="storage_where">कहाँ जाता है</string>
     <string name="storage_games">Steam गेम</string>

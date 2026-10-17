@@ -771,12 +771,12 @@
     <string name="gpu_mode_mix_short">混合</string>
     <string name="gpu_src_auto">自动</string>
     <string name="gpu_src_pair">配对</string>
-    <string name="gpu_src_bundle">内置</string>
+    <string name="gpu_src_bundle">组合包</string>
     <string name="gpu_src_chosen">已选</string>
     <string name="gpu_src_by_gpu">按 GPU</string>
     <string name="gpu_src_default">默认</string>
     <string name="gpu_display_live">正在绘制</string>
-    <string name="gpu_display_pending">等待重启 · 此前由 %1$s 绘制</string>
+    <string name="gpu_display_pending">等待重启 · 在此之前由 %1$s 绘制</string>
     <string name="gpu_runtime_live">正在运行</string>
     <string name="gpu_runtime_pending">下次会话生效 · 本次会话继续使用 %1$s</string>
     <string name="gpu_display_next">负责绘制屏幕。下次会话起生效。</string>
@@ -791,7 +791,7 @@
     <string name="gpu_pair_title">选择组合</string>
     <string name="gpu_pair_hint">组合会同时设置显示驱动与运行时驱动。</string>
     <string name="gpu_mix_title">分别选择驱动</string>
-    <string name="gpu_mix_hint">内置包会同时填充两处。显示驱动改动在重启后生效，运行时驱动在下次会话生效。</string>
+    <string name="gpu_mix_hint">组合包会同时填充两处。显示驱动改动在重启后生效，运行时驱动在下次会话生效。</string>
     <string name="gpu_change_display">更换显示驱动</string>
     <string name="gpu_change_runtime">更换运行时驱动</string>
     <string name="gpu_autos_pick">自动选择</string>

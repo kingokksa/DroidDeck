@@ -2382,7 +2382,7 @@
     <string name="storage_clean_up_lede">Itt semmi sem érinti a telepített játékokat vagy a futó letöltéseket.</string>
     <string name="storage_nothing_to_clean">Most nincs mit takarítani.</string>
     <string name="storage_selected">Kijelölve: %1$s · %2$s → %3$s szabadul fel</string>
-    <string name="storage_cleaning">Takarítás…</string>
+    <string name="storage_cleaning">Takarítás folyamatban…</string>
     <string name="storage_free_button">%1$s felszabadítása</string>
     <string name="storage_freed">%1$s felszabadítva.</string>
     <string name="storage_item_runtimes">Nem használt Steam futtatókörnyezetek és Proton</string>

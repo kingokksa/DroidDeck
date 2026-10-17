@@ -2155,12 +2155,12 @@
     <string name="gpu_mode_mix_short">Mix</string>
     <string name="gpu_src_auto">Auto</string>
     <string name="gpu_src_pair">Paar</string>
-    <string name="gpu_src_bundle">Integriert</string>
+    <string name="gpu_src_bundle">Paket</string>
     <string name="gpu_src_chosen">Gewählt</string>
     <string name="gpu_src_by_gpu">Nach GPU</string>
     <string name="gpu_src_default">Standard</string>
     <string name="gpu_display_live">Zeichnet</string>
-    <string name="gpu_display_pending">Neustart ausstehend · zuletzt von %1$s gezeichnet</string>
+    <string name="gpu_display_pending">Neustart ausstehend · bis dahin zeichnet %1$s</string>
     <string name="gpu_runtime_live">Läuft</string>
     <string name="gpu_runtime_pending">Gilt ab der nächsten Sitzung · diese Sitzung nutzt %1$s</string>
     <string name="gpu_display_next">Zeichnet den Bildschirm. Gilt ab der nächsten Sitzung.</string>
@@ -2175,7 +2175,7 @@
     <string name="gpu_pair_title">Kombination wählen</string>
     <string name="gpu_pair_hint">Eine Kombination legt Anzeigetreiber und Laufzeittreiber gemeinsam fest.</string>
     <string name="gpu_mix_title">Treiber getrennt wählen</string>
-    <string name="gpu_mix_hint">Ein integriertes Paket füllt beides. Änderungen am Anzeigetreiber greifen nach einem Neustart, der Laufzeittreiber ab der nächsten Sitzung.</string>
+    <string name="gpu_mix_hint">Ein Paket füllt beides. Änderungen am Anzeigetreiber greifen nach einem Neustart, der Laufzeittreiber ab der nächsten Sitzung.</string>
     <string name="gpu_change_display">Anzeigetreiber wechseln</string>
     <string name="gpu_change_runtime">Laufzeittreiber wechseln</string>
     <string name="gpu_autos_pick">Automatisch wählen</string>

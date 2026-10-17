@@ -2355,7 +2355,7 @@
     <string name="storage_other_apps">Muut Android-sovellukset</string>
     <string name="storage_safe_now">Vapautettavissa nyt</string>
     <string name="storage_safe_hint">Käyttämättömät ajonaikaympäristöt, jäänteet, vanhat lokit</string>
-    <string name="storage_clean_up">Siivotaan…</string>
+    <string name="storage_clean_up">Siivoa…</string>
     <string name="storage_session_running">Pysäytä istunto, jos haluat siivota tai poistaa jotain. Koot näkyvät silti.</string>
     <string name="storage_where">Mihin se menee</string>
     <string name="storage_games">Steam-pelit</string>

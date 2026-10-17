@@ -2405,7 +2405,7 @@
     <string name="storage_other_apps">Інші застосунки Android</string>
     <string name="storage_safe_now">Можна звільнити зараз</string>
     <string name="storage_safe_hint">Невикористані середовища виконання, залишки, старі журнали</string>
-    <string name="storage_clean_up">Очищення…</string>
+    <string name="storage_clean_up">Очистити…</string>
     <string name="storage_session_running">Зупиніть сеанс, щоб очистити або видалити будь-що. Розміри залишаться видними.</string>
     <string name="storage_where">Куди йде</string>
     <string name="storage_games">Ігри Steam</string>
@@ -2442,10 +2442,10 @@
     <string name="storage_item_logs_detail">Журнали поточного сеансу залишаться</string>
     <string name="storage_item_custom_detail">Жодна гра його не використовує. За потреби встановіть знову в Компоненти.</string>
     <string name="storage_item_shaders">Кеш шейдерів встановлених ігор</string>
-    <string name="storage_item_shaders_detail">Відновлюється під час гри. Перші хвилини кожної гри знову будуть із присіданнями.</string>
+    <string name="storage_item_shaders_detail">Відновлюється під час гри. Перші хвилини кожної гри знову пройдуть із ривками.</string>
     <string name="storage_tag_safe">Безпечно</string>
     <string name="storage_tag_unused">Не використовується</string>
-    <string name="storage_tag_stutter">Присідання</string>
+    <string name="storage_tag_stutter">Ривки</string>
     <string name="storage_tag_saves">Перевірте збереження</string>
     <string name="storage_tag_default">Типово</string>
     <string name="storage_tag_required">Потрібно</string>

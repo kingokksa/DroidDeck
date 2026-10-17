@@ -2405,7 +2405,7 @@
     <string name="storage_other_apps">Ostatní aplikace pro Android</string>
     <string name="storage_safe_now">Lze uvolnit hned</string>
     <string name="storage_safe_hint">Nevyužitá prostředí, zbytky, staré logy</string>
-    <string name="storage_clean_up">Čištění…</string>
+    <string name="storage_clean_up">Vyčistit…</string>
     <string name="storage_session_running">Zastav relaci, ať můžeš uklidit nebo něco smazat. Velikosti zůstávají vidět.</string>
     <string name="storage_where">Kam to jde</string>
     <string name="storage_games">Hry ze Steamu</string>

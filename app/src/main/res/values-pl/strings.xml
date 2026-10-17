@@ -2405,7 +2405,7 @@
     <string name="storage_other_apps">Inne aplikacje Android</string>
     <string name="storage_safe_now">Do zwolnienia teraz</string>
     <string name="storage_safe_hint">Nieużywane środowiska, pozostałości, stare logi</string>
-    <string name="storage_clean_up">Czyszczenie…</string>
+    <string name="storage_clean_up">Wyczyść…</string>
     <string name="storage_session_running">Zatrzymaj sesję, aby wyczyścić lub coś usunąć. Rozmiary pozostają widoczne.</string>
     <string name="storage_where">Gdzie to trafia</string>
     <string name="storage_games">Gry Steam</string>

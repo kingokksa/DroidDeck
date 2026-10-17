@@ -2330,7 +2330,7 @@
     <string name="storage_other_apps">แอป Android อื่น</string>
     <string name="storage_safe_now">ล้างได้ตอนนี้</string>
     <string name="storage_safe_hint">รันไทม์ที่ไม่ได้ใช้ เศษที่เหลือ ล็อกเก่า</string>
-    <string name="storage_clean_up">กำลังล้าง…</string>
+    <string name="storage_clean_up">ล้าง…</string>
     <string name="storage_session_running">หยุดเซสชันเพื่อล้างหรือลบอะไรก็ตาม ขนาดจะยังแสดงอยู่</string>
     <string name="storage_where">ไปอยู่ที่ไหน</string>
     <string name="storage_games">เกม Steam</string>

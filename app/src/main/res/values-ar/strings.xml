@@ -2455,7 +2455,7 @@
     <string name="storage_other_apps">تطبيقات Android الأخرى</string>
     <string name="storage_safe_now">يمكن تحريره الآن</string>
     <string name="storage_safe_hint">بيئات تشغيل غير مستخدمة وبقايا وسجلات قديمة</string>
-    <string name="storage_clean_up">جارٍ التنظيف…</string>
+    <string name="storage_clean_up">تنظيف…</string>
     <string name="storage_session_running">أوقف الجلسة لتنظيف التخزين أو حذف شيء. تبقى الأحجام ظاهرة.</string>
     <string name="storage_where">إلى أين يذهب</string>
     <string name="storage_games">ألعاب Steam</string>

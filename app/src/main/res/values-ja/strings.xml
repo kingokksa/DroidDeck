@@ -2146,7 +2146,7 @@
     <string name="gpu_mode_mix_short">個別</string>
     <string name="gpu_src_auto">自動</string>
     <string name="gpu_src_pair">ペア</string>
-    <string name="gpu_src_bundle">内蔵</string>
+    <string name="gpu_src_bundle">バンドル</string>
     <string name="gpu_src_chosen">選択済み</string>
     <string name="gpu_src_by_gpu">GPU 別</string>
     <string name="gpu_src_default">既定</string>
@@ -2166,7 +2166,7 @@
     <string name="gpu_pair_title">組み合わせを選択</string>
     <string name="gpu_pair_hint">組み合わせはディスプレイドライバーとランタイムドライバーをまとめて設定します。</string>
     <string name="gpu_mix_title">ドライバーを個別に選択</string>
-    <string name="gpu_mix_hint">内蔵パッケージは両方をまとめて設定します。ディスプレイドライバーの変更は再起動後に、ランタイムドライバーは次回セッションで有効になります。</string>
+    <string name="gpu_mix_hint">バンドルは両方のスロットを埋めます。ディスプレイドライバーの変更は再起動後に、ランタイムドライバーは次回セッションで有効になります。</string>
     <string name="gpu_change_display">ディスプレイドライバーを変更</string>
     <string name="gpu_change_runtime">ランタイムドライバーを変更</string>
     <string name="gpu_autos_pick">自動で選ぶ</string>

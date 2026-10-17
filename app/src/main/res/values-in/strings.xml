@@ -2330,7 +2330,7 @@
     <string name="storage_other_apps">Aplikasi Android lain</string>
     <string name="storage_safe_now">Bisa dikosongkan sekarang</string>
     <string name="storage_safe_hint">Runtime yang tidak dipakai, sisa, log lama</string>
-    <string name="storage_clean_up">Membersihkan…</string>
+    <string name="storage_clean_up">Bersihkan…</string>
     <string name="storage_session_running">Hentikan sesi untuk membersihkan atau menghapus apa pun. Ukuran tetap terlihat.</string>
     <string name="storage_where">Ke mana perginya</string>
     <string name="storage_games">Gim Steam</string>

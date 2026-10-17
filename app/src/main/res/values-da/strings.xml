@@ -2355,7 +2355,7 @@
     <string name="storage_other_apps">Andre Android-apps</string>
     <string name="storage_safe_now">Kan frigøres nu</string>
     <string name="storage_safe_hint">Ubrugte kørselsmiljøer, rester, gamle logfiler</string>
-    <string name="storage_clean_up">Rydder op…</string>
+    <string name="storage_clean_up">Ryd op…</string>
     <string name="storage_session_running">Stop sessionen for at rydde op eller slette noget. Størrelserne vises stadig.</string>
     <string name="storage_where">Hvor det ender</string>
     <string name="storage_games">Steam-spil</string>
