@@ -76,7 +76,7 @@ awk -F'"' '
   $2 == "size" { size[block] = $4 }
   $2 == "zipvz" { vz[block] = $4 }
   $2 == "sha2vz" { vzsha[block] = $4 }
-  END { for (b in file) if (b ~ /_all$/ || b ~ /_linuxarm64_linuxarm64$/) print b, file[b], sha[b], size[b] }
+  END { for (b in file) if (b ~ /_all$/ || b ~ /_linuxarm64_linuxarm64$/) print b, file[b], sha[b], size[b], vz[b] }
 ' "$work/manifest" | sort > "$work/parts"
 [ -s "$work/parts" ] || { echo "droiddeck-steam-install: no client components in $manifest" >&2; exit 1; }
 total=$(grep -c . "$work/parts" 2>/dev/null || echo 0)
@@ -116,7 +116,7 @@ fetch_part() {
     --retry 3 --retry-delay 3 --retry-all-errors -C - "$host/$file" -o "$target" || return 1
   echo "$sum  $target" | sha256sum -c --quiet 2>/dev/null || { rm -f "$target"; return 1; }
 }
-while read -r block file sum size; do
+while read -r block file sum size vzname; do
   i=$((${i:-0} + 1))
   echo "== STEP $(date -u +%H:%M:%S) downloading Steam: $block ($i/$total)"
   fetched=""
@@ -125,7 +125,9 @@ while read -r block file sum size; do
   done
   [ -n "$fetched" ] || { echo "droiddeck-steam-install: $file failed on every CDN" >&2; exit 1; }
   unzip -qo "$parts/$file" -d "$steam_root"
-  rm -f "$parts/$file"
+  # A block without a .vz variant is the archive the client checks for, so keep it
+  # where it looks for it instead of fetching the same bytes again below.
+  if [ -n "$vzname" ]; then rm -f "$parts/$file"; else mv -f "$parts/$file" "$steam_root/package/$file"; fi
 done < "$work/parts"
 # Steam verifies the archives in package/ by name and size before it unpacks them, so
 # leaving them there saves the client a first run that fetches the whole set again.
