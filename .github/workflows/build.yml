@@ -781,6 +781,7 @@ jobs:
           VK_INCLUDE=$(ls -d "$NDK"/toolchains/llvm/prebuilt/*/sysroot/usr/include | head -1)
           mkdir -p build/vr/include
           cp -R "$VK_INCLUDE/vulkan" build/vr/include/
+          if [ -d "$VK_INCLUDE/vk_video" ]; then cp -R "$VK_INCLUDE/vk_video" build/vr/include/; fi
           echo "VK_INCLUDE=$PWD/build/vr/include" >> "$GITHUB_ENV"
 
       - name: Install Python test dependencies
