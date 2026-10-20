@@ -222,6 +222,7 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
         with:
+          cache-read-only: false
           cache-cleanup: on-success
 
       - name: Resolve the runner's NDK
