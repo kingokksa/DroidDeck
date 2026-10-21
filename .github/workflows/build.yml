@@ -102,6 +102,10 @@ jobs:
     timeout-minutes: 45
     outputs:
       variants: ${{ steps.variants.outputs.list }}
+      build-outcome: ${{ steps.build.outcome }}
+      unit-test-outcome: ${{ steps.unit-tests.outcome }}
+      diagnostics-url: ${{ steps.unit-test-diagnostics.outputs.artifact-url }}
+      apk-outcome: ${{ steps.apk-upload.outcome }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -582,6 +586,14 @@ jobs:
           git diff --exit-code -- app/src/main/rust/stores/Cargo.lock \
             || { echo "::error::Cargo.lock changed during the build; commit the regenerated lockfile (uploaded as stores-cargo-lock)"; exit 1; }
 
+      - name: Upload the regenerated Cargo.lock
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stores-cargo-lock
+          path: app/src/main/rust/stores/Cargo.lock
+          if-no-files-found: ignore
+
       - name: Unit tests
         id: unit-tests
         if: inputs.skip_tests != true
@@ -648,17 +660,137 @@ jobs:
           retention-days: 30
           compression-level: 0
 
-      - name: Report on the pull request
-        if: always() && github.event_name == 'pull_request'
+      - name: Upload the build log for the pull request report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: |
+            /tmp/build.log
+            /tmp/pr-merge.md
+          if-no-files-found: ignore
+          retention-days: 7
+
+  tests:
+    name: Tests
+    needs: xbox
+    if: ${{ inputs.skip_tests != true && (github.event_name != 'pull_request' || !github.event.pull_request.draft) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Merge onto the pinned main
+        if: github.event_name == 'pull_request'
+        env:
+          BUILD_BASE_SHA: ${{ needs.xbox.outputs.base-sha }}
+        run: |
+          set -euo pipefail
+          git config user.name "ci"
+          git config user.email "ci@users.noreply.github.com"
+          git fetch --no-tags origin "$BUILD_BASE_SHA"
+          git merge --no-ff --no-edit FETCH_HEAD
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+          cache-cleanup: on-success
+
+      - name: Resolve the runner's NDK
+        run: |
+          NDK="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-$ANDROID_NDK_ROOT}}"
+          VERSION=$(sed -n 's/^Pkg.Revision *= *//p' "$NDK/source.properties")
+          echo "NDK_VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Rust toolchain for the store engines
+        id: rust
+        run: |
+          set -euo pipefail
+          rustup target add aarch64-linux-android
+          echo "rustc=$(rustc -V | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+          rustc -V; cargo -V
+
+      - name: Cache cargo registry and the store engines' target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            app/src/main/rust/stores/target
+          key: stores-${{ steps.rust.outputs.rustc }}-${{ hashFiles('app/src/main/rust/stores/Cargo.lock') }}
+          restore-keys: |
+            stores-${{ steps.rust.outputs.rustc }}-
+
+      - name: Cache cargo-ndk
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-ndk
+          key: cargo-ndk-v1
+
+      - name: cargo-ndk
+        run: |
+          set -euo pipefail
+          command -v cargo-ndk >/dev/null || cargo install cargo-ndk --locked
+          cargo ndk --version
+
+      - name: Store engines host unit tests
+        timeout-minutes: 10
         continue-on-error: true
+        run: |
+          set -o pipefail
+          cd app/src/main/rust/stores
+          cargo test --locked 2>&1 | tail -60
+
+      - name: Vulkan headers for the C tests
+        run: |
+          set -euo pipefail
+          NDK="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-$ANDROID_NDK_ROOT}}"
+          VK_INCLUDE=$(ls -d "$NDK"/toolchains/llvm/prebuilt/*/sysroot/usr/include | head -1)
+          mkdir -p build/vr/include
+          cp -R "$VK_INCLUDE/vulkan" build/vr/include/
+          if [ -d "$VK_INCLUDE/vk_video" ]; then cp -R "$VK_INCLUDE/vk_video" build/vr/include/; fi
+          echo "VK_INCLUDE=$PWD/build/vr/include" >> "$GITHUB_ENV"
+
+      - name: Install Python test dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq python3-yaml
+
+      - name: Steam import and game environment tests
+        run: python3 -m unittest discover -s tools/tests -p 'test_*.py'
+
+  report:
+    name: PR report
+    needs: [build, tests]
+    if: ${{ always() && github.event_name == 'pull_request' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: build-log
+          path: /tmp
+      - name: Report on the pull request
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          BUILD_OUTCOME: ${{ steps.build.outcome }}
-          UNIT_TEST_OUTCOME: ${{ steps.unit-tests.outcome }}
-          TEST_DIAGNOSTICS_URL: ${{ steps.unit-test-diagnostics.outputs.artifact-url }}
-          APK_OUTCOME: ${{ steps.apk-upload.outcome }}
+          BUILD_OUTCOME: ${{ needs.build.outputs.build-outcome }}
+          UNIT_TEST_OUTCOME: ${{ needs.build.outputs.unit-test-outcome }}
+          TEST_DIAGNOSTICS_URL: ${{ needs.build.outputs.diagnostics-url }}
+          APK_OUTCOME: ${{ needs.build.outputs.apk-outcome }}
+          TESTS_OUTCOME: ${{ needs.tests.result }}
           SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
         run: |
           set -uo pipefail
@@ -669,6 +801,12 @@ jobs:
             echo
             [ -f /tmp/pr-merge.md ] && cat /tmp/pr-merge.md
             echo
+            if [ "$TESTS_OUTCOME" != success ] && [ "$TESTS_OUTCOME" != skipped ]; then
+              echo "### ERROR: CI suites failed"
+              echo
+              echo "The APK build finished, but the `Tests` job failed. See [the run]($RUN_URL)."
+              echo
+            else
             case "$BUILD_OUTCOME:$UNIT_TEST_OUTCOME:$APK_OUTCOME" in
               success:success:success)
                 echo "###  Build passed"
@@ -728,6 +866,7 @@ jobs:
                 echo "The build did not run (see above, or [the run]($RUN_URL))."
                 ;;
             esac
+            fi
             echo
           } > /tmp/pr-report.md
           cat /tmp/pr-report.md >> "$GITHUB_STEP_SUMMARY"
@@ -738,98 +877,6 @@ jobs:
             gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" -F body=@/tmp/pr-report.md >/dev/null
           fi
 
-  tests:
-    name: Tests
-    if: ${{ inputs.skip_tests != true && (github.event_name != 'pull_request' || !github.event.pull_request.draft) }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.ref || github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 0
-          persist-credentials: false
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          cache-read-only: false
-          cache-cleanup: on-success
-
-      - name: Resolve the runner's NDK
-        run: |
-          NDK="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-$ANDROID_NDK_ROOT}}"
-          VERSION=$(sed -n 's/^Pkg.Revision *= *//p' "$NDK/source.properties")
-          echo "NDK_VERSION=$VERSION" >> "$GITHUB_ENV"
-
-      - name: Rust toolchain for the store engines
-        id: rust
-        run: |
-          set -euo pipefail
-          rustup target add aarch64-linux-android
-          echo "rustc=$(rustc -V | awk '{print $2}')" >> "$GITHUB_OUTPUT"
-          rustc -V; cargo -V
-
-      - name: Cache cargo registry and the store engines' target
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry/index
-            ~/.cargo/registry/cache
-            ~/.cargo/git/db
-            app/src/main/rust/stores/target
-          key: stores-${{ steps.rust.outputs.rustc }}-${{ hashFiles('app/src/main/rust/stores/Cargo.lock') }}
-          restore-keys: |
-            stores-${{ steps.rust.outputs.rustc }}-
-
-      - name: Cache cargo-ndk
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/bin/cargo-ndk
-          key: cargo-ndk-v1
-
-      - name: cargo-ndk
-        run: |
-          set -euo pipefail
-          command -v cargo-ndk >/dev/null || cargo install cargo-ndk --locked
-          cargo ndk --version
-
-      - name: Store engines host unit tests
-        timeout-minutes: 10
-        continue-on-error: true
-        run: |
-          cd app/src/main/rust/stores
-          cargo test --locked 2>&1 | tail -60
-
-      - name: Upload the regenerated Cargo.lock
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: stores-cargo-lock
-          path: app/src/main/rust/stores/Cargo.lock
-          if-no-files-found: ignore
-
-      - name: Vulkan headers for the C tests
-        run: |
-          set -euo pipefail
-          NDK="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-$ANDROID_NDK_ROOT}}"
-          VK_INCLUDE=$(ls -d "$NDK"/toolchains/llvm/prebuilt/*/sysroot/usr/include | head -1)
-          mkdir -p build/vr/include
-          cp -R "$VK_INCLUDE/vulkan" build/vr/include/
-          if [ -d "$VK_INCLUDE/vk_video" ]; then cp -R "$VK_INCLUDE/vk_video" build/vr/include/; fi
-          echo "VK_INCLUDE=$PWD/build/vr/include" >> "$GITHUB_ENV"
-
-      - name: Install Python test dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq python3-yaml
-
-      - name: Steam import and game environment tests
-        run: python3 -m unittest discover -s tools/tests -p 'test_*.py'
 
   sign:
     needs: [build, tests]
