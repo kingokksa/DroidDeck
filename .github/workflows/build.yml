@@ -833,7 +833,7 @@ jobs:
 
   sign:
     needs: [build, tests]
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && github.repository == 'Droid-Deck/DroidDeck'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && github.repository == 'Droid-Deck/DroidDeck' && !inputs.ref
     permissions:
       contents: read
       actions: read
@@ -845,7 +845,7 @@ jobs:
 
   packs:
     needs: build
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && !inputs.ref
     permissions:
       contents: read
       actions: read
@@ -854,7 +854,7 @@ jobs:
 
   announce:
     needs: [build, sign, packs]
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && !inputs.ref
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
