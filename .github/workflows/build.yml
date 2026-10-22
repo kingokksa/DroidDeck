@@ -16,15 +16,6 @@ on:
       - 'LICENSE'
       - '.gitignore'
   workflow_dispatch:
-    inputs:
-      ref:
-        description: Commit, tag or branch to build instead of the dispatched ref
-        type: string
-        default: ''
-      skip_tests:
-        description: Skip the unit and environment test steps
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -49,7 +40,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - name: Pin and merge the APK source
@@ -105,7 +96,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -222,7 +213,6 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
         with:
-          cache-read-only: false
           cache-cleanup: on-success
 
       - name: Resolve the runner's NDK
@@ -236,10 +226,9 @@ jobs:
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          BUILD_REF: ${{ inputs.ref || github.ref_name }}
+          BUILD_REF: ${{ github.ref_name }}
           BUILD_SHA: ${{ github.sha }}
         run: |
-          sha=$(git rev-parse --short HEAD)
           if [[ -n "$(git status --porcelain)" ]]; then
             tree_state=dirty
           else
@@ -249,10 +238,10 @@ jobs:
           if [[ -n "$PR_NUMBER" ]]; then
             label="pr${PR_NUMBER} at ${PR_HEAD_SHA:0:7}"
           else
-            label="${BUILD_REF} at ${sha}"
+            label="${BUILD_REF} at ${BUILD_SHA:0:7}"
           fi
           echo "label=$label" >> "$GITHUB_OUTPUT"
-          echo "DROIDDECK_SOURCE_COMMIT=${PR_HEAD_SHA:-$(git rev-parse HEAD)}" >> "$GITHUB_ENV"
+          echo "DROIDDECK_SOURCE_COMMIT=${PR_HEAD_SHA:-$BUILD_SHA}" >> "$GITHUB_ENV"
           echo "DROIDDECK_PR_NUMBER=${PR_NUMBER:-0}" >> "$GITHUB_ENV"
           echo "Build: \`$label\`" >> "$GITHUB_STEP_SUMMARY"
 
@@ -332,6 +321,17 @@ jobs:
           install -Dm644 tools/mangoapp/mangoapp "$D/usr/local/bin/mangoapp"
           rm -rf mango-pkgs
           ls -l "$M"
+          mkdir -p pw-pkgs
+          grep -v '^#' tools/pipewire/packages.txt | while read -r sum url; do
+            [ -n "$url" ] || continue
+            curl -fsSL --retry 3 -o pw-pkgs/pkg.tar.zst "$url"
+            echo "$sum  pw-pkgs/pkg.tar.zst" | sha256sum -c -
+            tar --use-compress-program=unzstd -xf pw-pkgs/pkg.tar.zst -C pw-pkgs
+            rm pw-pkgs/pkg.tar.zst
+          done
+          tools/pipewire/assemble.sh pw-pkgs "$D/usr/local/lib/droiddeck-pipewire.tzst"
+          rm -rf pw-pkgs
+          ls -l "$D/usr/local/lib/droiddeck-pipewire.tzst"
           T="$D/usr/local/lib/droiddeck-msitools"
           mkdir -p "$T" msi-pkgs
           grep -v '^#' tools/msitools/packages.txt | while read -r sum url; do
@@ -489,6 +489,8 @@ jobs:
           /tmp/test-xr-tracking
           g++ -std=c++17 -Wall -Wextra -Werror tools/vr/tests/test_xr_touch.cpp -o /tmp/test-xr-touch
           /tmp/test-xr-touch
+          g++ -std=c++17 -Wall -Wextra -Werror tools/vr/tests/test_pad_controller_config.cpp -o /tmp/test-pad-controller-config
+          /tmp/test-pad-controller-config
           g++ -std=c++17 -Wall -Wextra -Werror -pthread tools/vr/tests/test_xr_vsync.cpp -o /tmp/test-xr-vsync
           /tmp/test-xr-vsync
           g++ -std=c++17 -Wall -Wextra -Werror -pthread tools/vr/tests/test_xr_frames.cpp -o /tmp/test-xr-frames
@@ -522,12 +524,6 @@ jobs:
           restore-keys: |
             stores-${{ steps.rust.outputs.rustc }}-
 
-      - name: Cache cargo-ndk
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/bin/cargo-ndk
-          key: cargo-ndk-v1
-
       - name: cargo-ndk
         run: |
           set -euo pipefail
@@ -556,6 +552,9 @@ jobs:
           rustup target add --toolchain 1.90.0 aarch64-unknown-linux-gnu
           RUSTUP_TOOLCHAIN=1.90.0 bash tools/comet/build.sh
 
+      - name: Build the add-on packs
+        run: bash tools/packs/build.sh app/build/packs
+
       - name: Build
         id: build
         env:
@@ -580,7 +579,6 @@ jobs:
             || { echo "::error::Cargo.lock changed during the build; commit the regenerated lockfile (uploaded as stores-cargo-lock)"; exit 1; }
 
       - name: Store engines host unit tests
-        if: inputs.skip_tests != true
         timeout-minutes: 10
         continue-on-error: true
         run: |
@@ -596,18 +594,15 @@ jobs:
           if-no-files-found: ignore
 
       - name: Install Python test dependencies
-        if: inputs.skip_tests != true
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq python3-yaml
 
       - name: Steam import and game environment tests
-        if: inputs.skip_tests != true
         run: python3 -m unittest discover -s tools/tests -p 'test_*.py'
 
       - name: Unit tests
         id: unit-tests
-        if: inputs.skip_tests != true
         run: |
           set -o pipefail
           mkdir -p app/build
@@ -659,6 +654,14 @@ jobs:
         with:
           name: droiddeck-apk
           path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: droiddeck-packs
+          path: app/build/packs/*.tar.zst
           if-no-files-found: error
           retention-days: 30
           compression-level: 0
@@ -765,8 +768,17 @@ jobs:
       variants: ${{ needs.build.outputs.variants }}
     secrets: inherit
 
+  packs:
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/publish-packs.yml
+    secrets: inherit
+
   announce:
-    needs: [build, sign]
+    needs: [build, sign, packs]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
