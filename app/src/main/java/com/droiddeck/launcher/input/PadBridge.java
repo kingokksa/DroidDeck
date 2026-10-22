@@ -117,6 +117,16 @@ public final class PadBridge {
         if (changed && !on) resetBuiltin();
     }
 
+    private static volatile int firstSlot;
+
+    public static void setFirstSlot(int slot) {
+        firstSlot = slot;
+    }
+
+    private int firstPlayerSlot() {
+        return firstSlot;
+    }
+
     private void resetBuiltin() {
         routedTouch.clear();
         systemGuidePressed = false;
@@ -534,7 +544,7 @@ public final class PadBridge {
             if (owners[slot] != NO_CONTROLLER && InputDevice.getDevice(owners[slot]) == null) leave(slot, owners[slot]);
         }
         int side = JoyCon.side(device);
-        for (int slot = 0; side >= 0 && slot < SLOTS; slot++) {
+        for (int slot = firstPlayerSlot(); side >= 0 && slot < SLOTS; slot++) {
             if (owners[slot] == NO_CONTROLLER || partners[slot] != NO_CONTROLLER) continue;
             InputDevice owner = InputDevice.getDevice(owners[slot]);
             if (JoyCon.side(owner) != 1 - side) continue;
@@ -546,13 +556,13 @@ public final class PadBridge {
             Log.i(TAG, "\"" + device.getName() + "\" (id " + id + ") joins \"" + owner.getName() + "\" as player " + (slot + 1));
             return slot;
         }
-        for (int slot = 0; slot < SLOTS; slot++) {
+        for (int slot = firstPlayerSlot(); slot < SLOTS; slot++) {
             if (owners[slot] != NO_CONTROLLER) continue;
             owners[slot] = id;
             Log.i(TAG, "\"" + device.getName() + "\" (id " + id + ") is player " + (slot + 1));
             return slot;
         }
-        return 0;
+        return firstPlayerSlot();
     }
 
     private PadState stateFor(int slot) {
@@ -561,7 +571,8 @@ public final class PadBridge {
 
     private boolean isPrimary(KeyEvent event) {
         int id = event.getDevice().getId();
-        return owners[0] == id || partners[0] == id;
+        int first = firstPlayerSlot();
+        return owners[first] == id || partners[first] == id;
     }
 
     private void releaseBackPaddles() {
