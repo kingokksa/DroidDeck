@@ -2661,11 +2661,26 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
             WaylandCompositor.nativeSendTouch(action, event.getPointerId(index),
                 InputSpace.x(x, surfaceView.width), InputSpace.y(y, surfaceView.height))
         }
+        var lockedX = 0f
+        var lockedY = 0f
         fun sendPointer(index: Int) {
-            val x = event.getX(index).coerceIn(rect.left, rect.right)
-            val y = event.getY(index).coerceIn(rect.top, rect.bottom)
-            WaylandCompositor.nativeSendSceneInput(2,
-                InputSpace.x(x, surfaceView.width), InputSpace.y(y, surfaceView.height))
+            val x = event.getX(index)
+            val y = event.getY(index)
+            if (pointerLocked) {
+                if (surfaceView.width > 0 && surfaceView.height > 0) {
+                    WaylandCompositor.sendPointerDelta(
+                        (x - lockedX) * InputSpace.WIDTH.toFloat() / surfaceView.width,
+                        (y - lockedY) * InputSpace.HEIGHT.toFloat() / surfaceView.height)
+                }
+                lockedX = x
+                lockedY = y
+                return
+            }
+            val cx = x.coerceIn(rect.left, rect.right)
+            val cy = y.coerceIn(rect.top, rect.bottom)
+            // nativeSendPointer maps the input space into the scene; nativeSendSceneInput(2) does not.
+            WaylandCompositor.nativeSendPointer(1,
+                InputSpace.x(cx, surfaceView.width), InputSpace.y(cy, surfaceView.height))
         }
         // Wine games take no wl_touch, so an explicit direct touch drives the pointer.
         val directPointer = routedTouchMode == SessionPrefs.TOUCH_DIRECT
@@ -2676,6 +2691,8 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
                     WaylandCompositor.nativeSendSceneInput(3, it, 0)
                 }
                 if (directPointer) {
+                    lockedX = event.getX(event.actionIndex)
+                    lockedY = event.getY(event.actionIndex)
                     sendPointer(event.actionIndex)
                     WaylandCompositor.nativeSendSceneInput(3, PointerGestures.BTN_LEFT, 1)
                 } else {
