@@ -2661,18 +2661,41 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
             WaylandCompositor.nativeSendTouch(action, event.getPointerId(index),
                 InputSpace.x(x, surfaceView.width), InputSpace.y(y, surfaceView.height))
         }
+        fun sendPointer(index: Int) {
+            val x = event.getX(index).coerceIn(rect.left, rect.right)
+            val y = event.getY(index).coerceIn(rect.top, rect.bottom)
+            WaylandCompositor.nativeSendSceneInput(2,
+                InputSpace.x(x, surfaceView.width), InputSpace.y(y, surfaceView.height))
+        }
+        // Wine games take no wl_touch, so an explicit direct touch drives the pointer.
+        val directPointer = routedTouchMode == SessionPrefs.TOUCH_DIRECT
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 WaylandCompositor.nativeSendTouch(3, -1, 0, 0)
                 listOf(PointerGestures.BTN_LEFT, PointerGestures.BTN_RIGHT, PointerGestures.BTN_MIDDLE).forEach {
                     WaylandCompositor.nativeSendSceneInput(3, it, 0)
                 }
-                sendTouch(0, event.actionIndex)
+                if (directPointer) {
+                    sendPointer(event.actionIndex)
+                    WaylandCompositor.nativeSendSceneInput(3, PointerGestures.BTN_LEFT, 1)
+                } else {
+                    sendTouch(0, event.actionIndex)
+                }
             }
-            MotionEvent.ACTION_POINTER_DOWN -> sendTouch(0, event.actionIndex)
-            MotionEvent.ACTION_MOVE -> for (index in 0 until event.pointerCount) sendTouch(1, index)
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> sendTouch(2, event.actionIndex)
-            MotionEvent.ACTION_CANCEL -> WaylandCompositor.nativeSendTouch(3, -1, 0, 0)
+            MotionEvent.ACTION_POINTER_DOWN -> if (!directPointer) sendTouch(0, event.actionIndex)
+            MotionEvent.ACTION_MOVE -> for (index in 0 until event.pointerCount) {
+                if (directPointer) sendPointer(index) else sendTouch(1, index)
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> if (directPointer) {
+                sendPointer(event.actionIndex)
+                WaylandCompositor.nativeSendSceneInput(3, PointerGestures.BTN_LEFT, 0)
+            } else {
+                sendTouch(2, event.actionIndex)
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                WaylandCompositor.nativeSendTouch(3, -1, 0, 0)
+                if (directPointer) WaylandCompositor.nativeSendSceneInput(3, PointerGestures.BTN_LEFT, 0)
+            }
             else -> return false
         }
         return true
