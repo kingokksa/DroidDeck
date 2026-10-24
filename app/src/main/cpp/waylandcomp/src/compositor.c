@@ -2613,6 +2613,12 @@ static void pointer_input(double x, double y, int relative, uint32_t button, int
     }
     if (!target) return;
 
+    if (button)
+        droiddeck_log("pointer", "DBG %s %x rel:%d ptr %.0f,%.0f target %s at %d,%d grab %s",
+                      pressed ? "press" : "release", button, relative, g_ptr_x, g_ptr_y,
+                      target->title ? target->title : "?", target->x, target->y,
+                      g_grab && g_grab->title ? g_grab->title : "-");
+
     struct wl_client *client = wl_resource_get_client(target->resource);
     struct seat_pointer *sp;
     if (!pointer_for(client)) return;
@@ -2661,6 +2667,8 @@ static void pointer_button(uint32_t button, int pressed) {
     // pointer focus without motion or hit-testing: native touch has independent
     // coordinates, so replaying g_ptr_x/y here can warp the game cursor.
     uint32_t t = now_ms();
+    droiddeck_log("pointer", "DBG release %x ptr %.0f,%.0f focus %s", button, g_ptr_x, g_ptr_y,
+                  g_nptrs > 0 && g_ptrs[0].focus ? "yes" : "no");
     for (int i = 0; i < g_nptrs; i++) {
         struct seat_pointer *sp = &g_ptrs[i];
         if (!sp->focus) continue;
@@ -2687,6 +2695,10 @@ static void deliver_pointer(const struct input_msg *m) {
     if (y < 0) y = 0;
     if (x > w - 1) x = w - 1;
     if (y > h - 1) y = h - 1;
+    static int dbg_motion;
+    if (dbg_motion++ % 20 == 0)
+        droiddeck_log("pointer", "DBG motion in %d,%d -> scene %.0f,%.0f out %dx%d scene %dx%d action %d",
+                      m->p2, m->p3, x, y, ow, oh, w, h, m->p1);
     pointer_event(x, y, m->p1 == 1 ? 0 : BTN_LEFT, m->p1 == 0);
 }
 
