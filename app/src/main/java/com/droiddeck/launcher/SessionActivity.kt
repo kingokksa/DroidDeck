@@ -2358,12 +2358,12 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         cursorVisible = false
     }
 
-    private fun movePointer(x: Float, y: Float) {
+    private fun movePointer(x: Float, y: Float, localCursor: Boolean = true) {
         val rect = drawnRect() ?: return
         val cx = x.coerceIn(rect.left, rect.right)
         val cy = y.coerceIn(rect.top, rect.bottom)
         WaylandCompositor.nativeSendPointer(1, InputSpace.x(cx, surfaceView.width), InputSpace.y(cy, surfaceView.height))
-        showCursor(cx, cy)
+        if (localCursor) showCursor(cx, cy)
     }
 
     private fun showCursor(x: Float, y: Float) {
@@ -2600,7 +2600,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         releaseDirectTouch()
         if (::scrollTouch.isInitialized) scrollTouch.cancel()
         if (CompositorHost.isStarted) WaylandCompositor.nativeSendTouch(3, -1, 0, 0)
-        if (next == SessionPrefs.TOUCH_OFF) cursorVisible = false
+        if (next == SessionPrefs.TOUCH_OFF || next == SessionPrefs.TOUCH_DIRECT) cursorVisible = false
         routedTouchMode = next
     }
 
@@ -2630,6 +2630,13 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
 
     private var ignoreGameTouch = false
     private var directTouchPointer = -1
+    private var directTouchX = 0f
+    private var directTouchY = 0f
+    private var directTouchPressed = false
+    private val directTouchRelease = Runnable {
+        directTouchPressed = false
+        WaylandCompositor.nativeSendSceneInput(3, PointerGestures.BTN_LEFT, 0)
+    }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (event.isFromSource(android.view.InputDevice.SOURCE_MOUSE)) return onMouse(event)
@@ -2675,7 +2682,6 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
             if (directTouchHold.onTouch(event)) return true
             return nativeTouch(event, rect)
         }
-        if (directTouchHold.onTouch(event)) return true
         return directTouch(event)
     }
 
@@ -2704,31 +2710,42 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
     }
 
     private fun directTouch(event: MotionEvent): Boolean {
-        fun place(index: Int) = movePointer(event.getX(index), event.getY(index))
+        fun place(index: Int) = movePointer(event.getX(index), event.getY(index), localCursor = false)
+        val slop = PointerGestures.slop(this)
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                uiHandler.removeCallbacks(directTouchRelease)
+                directTouchPressed = false
                 directTouchPointer = event.getPointerId(0)
                 WaylandCompositor.nativeSendTouch(3, -1, 0, 0)
                 listOf(PointerGestures.BTN_LEFT, PointerGestures.BTN_RIGHT, PointerGestures.BTN_MIDDLE).forEach {
                     WaylandCompositor.nativeSendSceneInput(3, it, 0)
                 }
                 place(0)
-                WaylandCompositor.nativeSendSceneInput(3, PointerGestures.BTN_LEFT, 1)
+                directTouchX = event.x
+                directTouchY = event.y
             }
             MotionEvent.ACTION_MOVE -> {
                 val index = event.findPointerIndex(directTouchPointer)
-                if (index >= 0) place(index)
+                if (index >= 0) {
+                    place(index)
+                    if (!directTouchPressed && (abs(event.getX(index) - directTouchX) > slop ||
+                            abs(event.getY(index) - directTouchY) > slop)) {
+                        directTouchPressed = true
+                        WaylandCompositor.nativeSendSceneInput(3, PointerGestures.BTN_LEFT, 1)
+                    }
+                }
             }
             MotionEvent.ACTION_POINTER_DOWN -> Unit
             MotionEvent.ACTION_UP -> {
                 val index = event.findPointerIndex(directTouchPointer)
                 if (index >= 0) place(index)
-                releaseDirectTouch()
+                endDirectTouch()
             }
             MotionEvent.ACTION_POINTER_UP ->
                 if (event.getPointerId(event.actionIndex) == directTouchPointer) {
                     place(event.actionIndex)
-                    releaseDirectTouch()
+                    endDirectTouch()
                 }
             MotionEvent.ACTION_CANCEL -> releaseDirectTouch()
             else -> return false
@@ -2736,10 +2753,23 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         return true
     }
 
-    private fun releaseDirectTouch() {
+    private fun endDirectTouch() {
         if (directTouchPointer < 0) return
         directTouchPointer = -1
-        WaylandCompositor.nativeSendSceneInput(3, PointerGestures.BTN_LEFT, 0)
+        if (directTouchPressed) {
+            directTouchRelease.run()
+        } else {
+            WaylandCompositor.nativeSendSceneInput(3, PointerGestures.BTN_LEFT, 1)
+            directTouchPressed = true
+            uiHandler.postDelayed(directTouchRelease, DIRECT_CLICK_RELEASE_MS)
+        }
+    }
+
+    private fun releaseDirectTouch() {
+        if (directTouchPointer < 0 && !directTouchPressed) return
+        directTouchPointer = -1
+        uiHandler.removeCallbacks(directTouchRelease)
+        if (directTouchPressed) directTouchRelease.run()
     }
 
     private fun onMouse(event: MotionEvent): Boolean {
@@ -3130,6 +3160,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         if (::touchscreenGestures.isInitialized) touchscreenGestures.cancel()
         if (::touchpad.isInitialized) touchpad.cancel()
         if (::directTouchHold.isInitialized) directTouchHold.cancel()
+        releaseDirectTouch()
         uiHandler.removeCallbacks(clearRecognizedGesture)
         gestureSettingsOpen = false
         drawerOpen = false
@@ -3650,6 +3681,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         private const val FEX_MISSING = "droiddeck-fex: x86 Linux programs need"
         private const val UNBUFFERED_SOURCES = InputDevice.SOURCE_CLASS_JOYSTICK or InputDevice.SOURCE_CLASS_TRACKBALL or InputDevice.SOURCE_CLASS_POSITION
         private const val CURSOR_PAD_HOLD_MS = 1200L
+        private const val DIRECT_CLICK_RELEASE_MS = 50L
         private const val PAD_MOUSE_CHECK_MS = 500L
         private const val PAD_SCROLL_POINTER_X = 0.985f
         private const val PAD_SCROLL_HEIGHTS_PER_S = 3f

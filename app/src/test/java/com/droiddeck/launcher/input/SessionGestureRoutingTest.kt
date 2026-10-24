@@ -169,17 +169,71 @@ class SessionGestureRoutingTest {
             directButtons.clear()
             prepare(mode, TouchGestureConfig(longPressEnabled = true, longPressAction = "key_E"))
             val now = SystemClock.uptimeMillis()
-            val event = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, 400f, 300f, 0)
-            try { assertTrue(activity.onTouchEvent(event)) } finally { event.recycle() }
             val gestureMode = mode == SessionPrefs.TOUCH_GESTURES
-            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(if (gestureMode) 350 else 500))
-            assertEquals(if (gestureMode) listOf(18 to true) else emptyList(), keys)
-            assertEquals(if (gestureMode) emptyList() else listOf(PointerGestures.BTN_RIGHT to true), directButtons)
+            if (gestureMode) {
+                val event = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, 400f, 300f, 0)
+                try { assertTrue(activity.onTouchEvent(event)) } finally { event.recycle() }
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(350))
+                assertEquals(listOf(18 to true), keys)
+            } else {
+                sendDirectDrag(now)
+                assertEquals(listOf(0, 1), leftValues())
+            }
             ReflectionHelpers.callInstanceMethod<Unit>(activity, "onPause")
             assertEquals(if (gestureMode) listOf(18 to true, 18 to false) else emptyList(), keys)
-            assertEquals(if (gestureMode) emptyList() else listOf(PointerGestures.BTN_RIGHT to true, PointerGestures.BTN_RIGHT to false), directButtons)
+            if (gestureMode) {
+                assertTrue(directButtons.isEmpty())
+            } else {
+                assertEquals(listOf(0, 1, 0), leftValues())
+            }
         }
     }
+
+    @Test fun directModeTapSendsOneLeftClick() {
+        prepare(SessionPrefs.TOUCH_DIRECT)
+        val down = SystemClock.uptimeMillis()
+        sendDirect(down, MotionEvent.ACTION_DOWN to (400f to 300f), MotionEvent.ACTION_UP to (401f to 301f))
+        assertEquals(listOf(0, 1), leftValues())
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100))
+        assertEquals(listOf(0, 1, 0), leftValues())
+    }
+
+    @Test fun directModeDragHoldsLeftOnlyPastSlop() {
+        prepare(SessionPrefs.TOUCH_DIRECT)
+        val down = SystemClock.uptimeMillis()
+        sendDirect(down,
+            MotionEvent.ACTION_DOWN to (400f to 300f),
+            MotionEvent.ACTION_MOVE to (402f to 301f),
+            MotionEvent.ACTION_MOVE to (450f to 350f),
+            MotionEvent.ACTION_UP to (452f to 352f))
+        assertEquals(listOf(0, 1, 0), leftValues())
+    }
+
+    @Test fun directModeStationaryHoldSendsNoButton() {
+        prepare(SessionPrefs.TOUCH_DIRECT)
+        val down = SystemClock.uptimeMillis()
+        sendDirect(down, MotionEvent.ACTION_DOWN to (400f to 300f))
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(700))
+        assertEquals(listOf(0), leftValues())
+        assertTrue(directButtons.isEmpty())
+    }
+
+    private fun sendDirectDrag(start: Long) {
+        sendDirect(start,
+            MotionEvent.ACTION_DOWN to (400f to 300f),
+            MotionEvent.ACTION_MOVE to (450f to 350f))
+    }
+
+    private fun sendDirect(start: Long, vararg steps: Pair<Int, Pair<Float, Float>>) {
+        steps.forEachIndexed { index, (action, position) ->
+            val event = MotionEvent.obtain(start, start + index * 40L, action, position.first, position.second, 0)
+            try { assertTrue(activity.onTouchEvent(event)) } finally { event.recycle() }
+        }
+    }
+
+    private fun leftValues() = CompositorShadow.sceneInputs
+        .filter { it.first == 3 && it.second == PointerGestures.BTN_LEFT }
+        .map { it.third }
 
     private fun startLongPress() {
         prepare(SessionPrefs.TOUCH_GESTURES, TouchGestureConfig(longPressEnabled = true, longPressAction = "key_E"))
@@ -191,6 +245,11 @@ class SessionGestureRoutingTest {
     }
 
     private fun prepare(mode: String, config: TouchGestureConfig = TouchGestureConfig()) {
+        keys.clear()
+        directButtons.clear()
+        scrollPositions.clear()
+        scrollDeltas.clear()
+        CompositorShadow.sceneInputs.clear()
         SessionState.mode = SessionService.MODE_STEAM
         SessionState.steamUi = "bigpicture"
         SessionState.suspended = false
@@ -258,9 +317,12 @@ class SessionGestureRoutingTest {
     @Implements(value = WaylandCompositor::class, isInAndroidSdk = false)
     class CompositorShadow {
         companion object {
+            val sceneInputs = mutableListOf<Triple<Int, Int, Int>>()
             @JvmStatic @Implementation fun __staticInitializer__() {}
             @JvmStatic @Implementation fun nativeSendTouch(action: Int, id: Int, x: Int, y: Int) {}
-            @JvmStatic @Implementation fun nativeSendSceneInput(type: Int, code: Int, value: Int) {}
+            @JvmStatic @Implementation fun nativeSendSceneInput(type: Int, code: Int, value: Int) {
+                sceneInputs += Triple(type, code, value)
+            }
         }
     }
 }
