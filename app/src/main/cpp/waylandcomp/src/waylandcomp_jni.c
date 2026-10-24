@@ -20,6 +20,7 @@
 
 extern int droiddeck_wayland_run(void);
 extern void droiddeck_wayland_set_scale_mode(int mode, int alignment);
+extern void droiddeck_pointer_pos(double *x, double *y);
 extern void droiddeck_wayland_send_pointer(int action, int x, int y);
 extern void droiddeck_wayland_send_touch(int action, int pointer_id, int x, int y);
 extern int  droiddeck_cursor_snapshot(int *out, int cap);
@@ -370,6 +371,15 @@ Java_com_droiddeck_launcher_wayland_WaylandCompositor_nativeGamePictureRect(JNIE
     if (!vkp_game_picture_rect(rect)) return JNI_FALSE;
     (*env)->SetFloatArrayRegion(env, out, 0, 4, rect);
     return JNI_TRUE;
+}
+
+JNIEXPORT void JNICALL
+Java_com_droiddeck_launcher_wayland_WaylandCompositor_nativePointerPos(JNIEnv *env, jclass clazz, jfloatArray out) {
+    if (!out || (*env)->GetArrayLength(env, out) < 2) return;
+    double x = 0.0, y = 0.0;
+    droiddeck_pointer_pos(&x, &y);
+    float pos[2] = { (float)x, (float)y };
+    (*env)->SetFloatArrayRegion(env, out, 0, 2, pos);
 }
 
 JNIEXPORT void JNICALL

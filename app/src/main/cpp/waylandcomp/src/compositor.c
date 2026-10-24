@@ -2254,6 +2254,11 @@ static double g_ptr_x, g_ptr_y;
 static double g_raw_x, g_raw_y;
 static int g_raw_valid;
 
+void droiddeck_pointer_pos(double *x, double *y) {
+    if (x) *x = g_ptr_x;
+    if (y) *y = g_ptr_y;
+}
+
 extern void droiddeck_on_pointer_lock(int locked, int x, int y);
 
 static void sync_lock_notify(void) {

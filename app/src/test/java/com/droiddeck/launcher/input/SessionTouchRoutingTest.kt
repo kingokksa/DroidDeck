@@ -59,7 +59,9 @@ class SessionTouchRoutingTest {
             assertEquals(SessionPrefs.TOUCH_AUTO, ReflectionHelpers.getField<String>(activity, "routedTouchMode"))
             invoke("updateOnScreenControls")
             assertEquals(View.GONE, steam.visibility)
-            assertEquals(mode, ReflectionHelpers.getField<String>(activity, "routedTouchMode"))
+            assertEquals(
+                if (mode == SessionPrefs.TOUCH_DIRECT) SessionPrefs.TOUCH_AUTO else mode,
+                ReflectionHelpers.getField<String>(activity, "routedTouchMode"))
             assertEquals(1.15f, touchpad.sensitivity, 0f)
         }
     }

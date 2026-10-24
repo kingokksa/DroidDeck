@@ -221,11 +221,23 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
     private var cursorSerial = 0
     private var clientHidesCursor = false
     private var pointerLocked = false
-    private val pointerLockListener = WaylandCompositor.PointerLockListener { locked, _, _ ->
+    private var walkSceneX = 0f
+    private var walkSceneY = 0f
+    private var walkSceneValid = false
+    private fun sendWalkDelta(dx: Float, dy: Float) {
+        WaylandCompositor.sendPointerDelta(dx, dy)
+        val out = SessionState.outputSize
+        walkSceneX = (walkSceneX + dx).coerceIn(0f, out.first - 1f)
+        walkSceneY = (walkSceneY + dy).coerceIn(0f, out.second - 1f)
+    }
+    private val pointerLockListener = WaylandCompositor.PointerLockListener { locked, x, y ->
         uiHandler.post {
             if (pointerLocked == locked) return@post
             gesturePointerReady = false
             pointerLocked = locked
+            // While locked the host position freezes, so the app tracks every delta it sends.
+            walkSceneValid = locked
+            if (locked) { walkSceneX = x.toFloat(); walkSceneY = y.toFloat() }
             Log.i(TAG, "pointer lock " + if (locked) "taken by a program" else "released")
             padMouseCheckedAt = 0L
             if (::padMouse.isInitialized) padMouseMode()
@@ -2247,7 +2259,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
             val rect = drawnRect() ?: return
             if (relative || pointerLocked) {
                 val scale = SessionState.outputSize.first / rect.width()
-                WaylandCompositor.sendPointerDelta(dx * scale, dy * scale)
+                sendWalkDelta(dx * scale, dy * scale)
             } else moveTo(gesturePointerX + dx, gesturePointerY + dy)
         }
         override fun button(code: Int, down: Boolean) {
@@ -2353,7 +2365,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
     private fun moveLockedPointer(x: Float, y: Float) {
         val rect = drawnRect() ?: return
         val scale = SessionState.outputSize.first / rect.width()
-        WaylandCompositor.sendPointerDelta((x - rect.centerX()) * scale, (y - rect.centerY()) * scale)
+        sendWalkDelta((x - rect.centerX()) * scale, (y - rect.centerY()) * scale)
         touchpad.place(rect.centerX(), rect.centerY())
         cursorVisible = false
     }
@@ -2590,22 +2602,28 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
     private fun effectiveTouchMode(): String {
         val options = steamTouchOptions
         val touchAppId = com.droiddeck.launcher.input.SteamTouchDevice.current?.state()?.appId
-        val bigPicture = touchAppId == null || touchAppId == 0
+        val inGame = touchAppId != null && touchAppId != 0
+        val steamUiUp = touchAppId != null && !inGame
         if (options == null || steamTouchControls?.visibility != View.VISIBLE) {
             val pref = SessionPrefs.touchMode(this)
             // A Steam session runs gamescope with touches passed straight through, which a
             // desktop game ignores: there Auto drives the pointer instead of the finger.
-            if (pref == SessionPrefs.TOUCH_AUTO && SessionState.mode == SessionService.MODE_STEAM && !bigPicture)
-                return SessionPrefs.TOUCH_DIRECT
-            return pref
+            // Big Picture takes the finger natively even when Direct is the saved mode.
+            return when {
+                inGame && pref == SessionPrefs.TOUCH_AUTO && SessionState.mode == SessionService.MODE_STEAM ->
+                    SessionPrefs.TOUCH_DIRECT
+                steamUiUp && pref == SessionPrefs.TOUCH_DIRECT && SessionState.steamUi != "desktop" ->
+                    SessionPrefs.TOUCH_AUTO
+                else -> pref
+            }
         }
         return when {
             options.inputMode == com.droiddeck.launcher.input.SteamTouchConfig.INPUT_CONTROLLER -> SessionPrefs.TOUCH_OFF
             SessionPrefs.touchMode(this) == SessionPrefs.TOUCH_GESTURES -> SessionPrefs.TOUCH_GESTURES
             options.mouseMode == com.droiddeck.launcher.input.SteamTouchConfig.MOUSE_RELATIVE -> SessionPrefs.TOUCH_PAD
             // Big Picture takes a real finger natively; a game with Steam's mouse mode gets the pointer.
-            bigPicture -> SessionPrefs.TOUCH_AUTO
-            else -> SessionPrefs.TOUCH_DIRECT
+            inGame -> SessionPrefs.TOUCH_DIRECT
+            else -> SessionPrefs.TOUCH_AUTO
         }
     }
 
@@ -2657,10 +2675,38 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
     private var directTouchX = 0f
     private var directTouchY = 0f
     private var directTouchPressed = false
+    private var directWalkTargetX = 0f
+    private var directWalkTargetY = 0f
+    private var directWalkArrival: (() -> Unit)? = null
+    private var directWalkDeadline = 0L
     private val directTouchRelease = Runnable {
         directTouchPressed = false
         WaylandCompositor.nativeSendSceneInput(3, PointerGestures.BTN_LEFT, 0)
     }
+    private val directWalk: Runnable = Runnable {
+        if (!walkSceneValid) { directWalkArrival = null; return@Runnable }
+        var dx = directWalkTargetX - walkSceneX
+        var dy = directWalkTargetY - walkSceneY
+        if (abs(dx) > DIRECT_WALK_ARRIVE_PX || abs(dy) > DIRECT_WALK_ARRIVE_PX) {
+            sendWalkDelta(
+                (dx * DIRECT_WALK_GAIN).coerceIn(-DIRECT_WALK_MAX_STEP, DIRECT_WALK_MAX_STEP),
+                (dy * DIRECT_WALK_GAIN).coerceIn(-DIRECT_WALK_MAX_STEP, DIRECT_WALK_MAX_STEP))
+            dx = directWalkTargetX - walkSceneX
+            dy = directWalkTargetY - walkSceneY
+        }
+        val arrived = abs(dx) <= DIRECT_WALK_ARRIVE_PX && abs(dy) <= DIRECT_WALK_ARRIVE_PX
+        val expired = directWalkArrival != null && SystemClock.uptimeMillis() >= directWalkDeadline
+        if (arrived || expired) {
+            val action = directWalkArrival
+            directWalkArrival = null
+            action?.invoke()
+            return@Runnable
+        }
+        uiHandler.postDelayed(directWalk, DIRECT_WALK_INTERVAL_MS)
+    }
+    private fun directWalkArrived() =
+        walkSceneValid && abs(directWalkTargetX - walkSceneX) <= DIRECT_WALK_ARRIVE_PX &&
+            abs(directWalkTargetY - walkSceneY) <= DIRECT_WALK_ARRIVE_PX
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (event.actionMasked == MotionEvent.ACTION_DOWN || event.actionMasked == MotionEvent.ACTION_POINTER_DOWN)
@@ -2736,11 +2782,14 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
     }
 
     private fun directTouch(event: MotionEvent): Boolean {
-        fun place(index: Int) = movePointer(event.getX(index), event.getY(index), localCursor = false)
+        val rect = drawnRect() ?: return false
         val slop = PointerGestures.slop(this)
+        fun place(index: Int) = directPlace(event.getX(index), event.getY(index), rect)
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 uiHandler.removeCallbacks(directTouchRelease)
+                uiHandler.removeCallbacks(directWalk)
+                directWalkArrival = null
                 directTouchPressed = false
                 directTouchPointer = event.getPointerId(0)
                 WaylandCompositor.nativeSendTouch(3, -1, 0, 0)
@@ -2748,7 +2797,6 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
                     WaylandCompositor.nativeSendSceneInput(3, it, 0)
                 }
                 place(0)
-                Log.i(TAG, "diag direct down ${event.x.toInt()},${event.y.toInt()}")
                 directTouchX = event.x
                 directTouchY = event.y
             }
@@ -2759,7 +2807,6 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
                     if (!directTouchPressed && (abs(event.getX(index) - directTouchX) > slop ||
                             abs(event.getY(index) - directTouchY) > slop)) {
                         directTouchPressed = true
-                        Log.i(TAG, "diag direct press ${event.getX(index).toInt()},${event.getY(index).toInt()}")
                         WaylandCompositor.nativeSendSceneInput(3, PointerGestures.BTN_LEFT, 1)
                     }
                 }
@@ -2781,22 +2828,47 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         return true
     }
 
+    // A locked game reads only relative motion and discards large jumps, so while locked
+    // the pointer walks to the finger in capped steps; anywhere else it warps absolutely.
+    private fun directPlace(x: Float, y: Float, rect: android.graphics.RectF) {
+        if (!pointerLocked || !walkSceneValid) {
+            movePointer(x, y, localCursor = false)
+            return
+        }
+        val out = SessionState.outputSize
+        directWalkTargetX = ((x - rect.left) / rect.width() * out.first).coerceIn(0f, out.first - 1f)
+        directWalkTargetY = ((y - rect.top) / rect.height() * out.second).coerceIn(0f, out.second - 1f)
+        uiHandler.removeCallbacks(directWalk)
+        uiHandler.post(directWalk)
+    }
+
     private fun endDirectTouch() {
         if (directTouchPointer < 0) return
-        Log.i(TAG, "diag direct up pressed=$directTouchPressed")
         directTouchPointer = -1
         if (directTouchPressed) {
             directTouchRelease.run()
+        } else if (pointerLocked && walkSceneValid && !directWalkArrived()) {
+            directWalkDeadline = SystemClock.uptimeMillis() + DIRECT_WALK_ARRIVE_TIMEOUT_MS
+            directWalkArrival = { clickDirectTouch() }
+            uiHandler.removeCallbacks(directWalk)
+            uiHandler.post(directWalk)
         } else {
-            WaylandCompositor.nativeSendSceneInput(3, PointerGestures.BTN_LEFT, 1)
-            directTouchPressed = true
-            uiHandler.postDelayed(directTouchRelease, DIRECT_CLICK_RELEASE_MS)
+            clickDirectTouch()
         }
     }
 
+    private fun clickDirectTouch() {
+        WaylandCompositor.nativeSendSceneInput(3, PointerGestures.BTN_LEFT, 1)
+        directTouchPressed = true
+        uiHandler.removeCallbacks(directTouchRelease)
+        uiHandler.postDelayed(directTouchRelease, DIRECT_CLICK_RELEASE_MS)
+    }
+
     private fun releaseDirectTouch() {
-        if (directTouchPointer < 0 && !directTouchPressed) return
+        if (directTouchPointer < 0 && !directTouchPressed && directWalkArrival == null) return
         directTouchPointer = -1
+        directWalkArrival = null
+        uiHandler.removeCallbacks(directWalk)
         uiHandler.removeCallbacks(directTouchRelease)
         if (directTouchPressed) directTouchRelease.run()
     }
@@ -3711,6 +3783,11 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         private const val UNBUFFERED_SOURCES = InputDevice.SOURCE_CLASS_JOYSTICK or InputDevice.SOURCE_CLASS_TRACKBALL or InputDevice.SOURCE_CLASS_POSITION
         private const val CURSOR_PAD_HOLD_MS = 1200L
         private const val DIRECT_CLICK_RELEASE_MS = 50L
+        private const val DIRECT_WALK_MAX_STEP = 40f
+        private const val DIRECT_WALK_GAIN = 0.35f
+        private const val DIRECT_WALK_ARRIVE_PX = 4f
+        private const val DIRECT_WALK_INTERVAL_MS = 16L
+        private const val DIRECT_WALK_ARRIVE_TIMEOUT_MS = 600L
         private const val PAD_MOUSE_CHECK_MS = 500L
         private const val PAD_SCROLL_POINTER_X = 0.985f
         private const val PAD_SCROLL_HEIGHTS_PER_S = 3f
