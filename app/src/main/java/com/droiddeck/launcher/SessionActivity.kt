@@ -2577,11 +2577,22 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
 
     private fun effectiveTouchMode(): String {
         val options = steamTouchOptions
-        if (options == null || steamTouchControls?.visibility != View.VISIBLE) return SessionPrefs.touchMode(this)
+        val touchAppId = com.droiddeck.launcher.input.SteamTouchDevice.current?.state()?.appId
+        val bigPicture = touchAppId == null || touchAppId == 0
+        if (options == null || steamTouchControls?.visibility != View.VISIBLE) {
+            val pref = SessionPrefs.touchMode(this)
+            // A Steam session runs gamescope with touches passed straight through, which a
+            // desktop game ignores: there Auto drives the pointer instead of the finger.
+            if (pref == SessionPrefs.TOUCH_AUTO && SessionState.mode == SessionService.MODE_STEAM && !bigPicture)
+                return SessionPrefs.TOUCH_DIRECT
+            return pref
+        }
         return when {
             options.inputMode == com.droiddeck.launcher.input.SteamTouchConfig.INPUT_CONTROLLER -> SessionPrefs.TOUCH_OFF
             SessionPrefs.touchMode(this) == SessionPrefs.TOUCH_GESTURES -> SessionPrefs.TOUCH_GESTURES
             options.mouseMode == com.droiddeck.launcher.input.SteamTouchConfig.MOUSE_RELATIVE -> SessionPrefs.TOUCH_PAD
+            // Big Picture takes a real finger natively; a game with Steam's mouse mode gets the pointer.
+            bigPicture -> SessionPrefs.TOUCH_AUTO
             else -> SessionPrefs.TOUCH_DIRECT
         }
     }
@@ -2593,6 +2604,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
             touchpad.sensitivity = 1.15f * speed
         }
         if (next == routedTouchMode) return
+        Log.i(TAG, "touch routing: $routedTouchMode -> $next")
         if (::touchscreenGestures.isInitialized) touchscreenGestures.cancel()
         gesturePointerReady = false
         if (::touchpad.isInitialized) touchpad.cancel()

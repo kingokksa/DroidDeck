@@ -56,12 +56,33 @@ class SessionTouchRoutingTest {
             SessionPrefs.setOscMode(activity, SessionPrefs.OSC_NEVER)
             steam.visibility = View.VISIBLE
             invoke("readPrefs")
-            assertEquals(SessionPrefs.TOUCH_DIRECT, ReflectionHelpers.getField<String>(activity, "routedTouchMode"))
+            assertEquals(SessionPrefs.TOUCH_AUTO, ReflectionHelpers.getField<String>(activity, "routedTouchMode"))
             invoke("updateOnScreenControls")
             assertEquals(View.GONE, steam.visibility)
             assertEquals(mode, ReflectionHelpers.getField<String>(activity, "routedTouchMode"))
             assertEquals(1.15f, touchpad.sensitivity, 0f)
         }
+    }
+
+    @Test fun aRunningGameRoutesAutoToThePointerInAndOutOfTheSteamLayout() {
+        val buffer = ReflectionHelpers.getField<java.nio.ByteBuffer>(SteamTouchDevice.current!!, "buffer")
+        buffer.putInt(76, 1234)
+        try {
+            for (visible in listOf(View.VISIBLE, View.GONE)) {
+                for (mode in listOf(SessionPrefs.TOUCH_AUTO, SessionPrefs.TOUCH_DIRECT)) {
+                    SessionPrefs.setTouchMode(activity, mode)
+                    steam.visibility = visible
+                    invoke("readPrefs")
+                    assertEquals(SessionPrefs.TOUCH_DIRECT, ReflectionHelpers.getField<String>(activity, "routedTouchMode"))
+                }
+            }
+        } finally {
+            buffer.putInt(76, 0)
+        }
+        SessionPrefs.setTouchMode(activity, SessionPrefs.TOUCH_AUTO)
+        steam.visibility = View.GONE
+        invoke("readPrefs")
+        assertEquals(SessionPrefs.TOUCH_AUTO, ReflectionHelpers.getField<String>(activity, "routedTouchMode"))
     }
 
     private fun field(name: String, value: Any) = ReflectionHelpers.setField(activity, name, value)
