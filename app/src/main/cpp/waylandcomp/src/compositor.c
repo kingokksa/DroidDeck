@@ -808,10 +808,14 @@ static uint32_t nominal_refresh_ns(void) {
 }
 
 static int64_t presented_ns(int64_t render_ns) {
-    if (!g_tick_vsync_ns || render_ns - g_last_vsync_ns > (int64_t)nominal_refresh_ns() ||
-        render_ns < g_tick_vsync_ns)
+    int64_t tick = g_tick_vsync_ns;
+    int64_t refresh = (int64_t)nominal_refresh_ns();
+    if (!tick || render_ns - g_last_vsync_ns > refresh)
         return render_ns;
-    return g_tick_vsync_ns;
+    int64_t delta = render_ns - tick;
+    if (delta > refresh || -delta > refresh)
+        return render_ns;
+    return tick;
 }
 
 static void feedback_present_all(struct wl_list *list, int64_t t) {
@@ -2615,13 +2619,32 @@ static void pointer_input(double x, double y, int relative, uint32_t button, int
 
     struct wl_client *client = wl_resource_get_client(target->resource);
     struct seat_pointer *sp;
-    if (!pointer_for(client)) return;
+    if (!pointer_for(client)) {
+        if (button) {
+            char gone[160];
+            describe(target, gone, sizeof(gone));
+            droiddeck_log("pointer", "%s has no pointer to take the button", gone);
+        }
+        return;
+    }
     int tx = 0, ty = 0;
     if (target != g_desktop && target->placed) { tx = target->x; ty = target->y; }
     wl_fixed_t fx = wl_fixed_from_double(g_ptr_x - tx), fy = wl_fixed_from_double(g_ptr_y - ty);
     uint32_t t = now_ms();
 
     pointer_focus(target->resource, fx, fy);
+    {
+        static struct surface *diag_target;
+        static int diag_moves;
+        int moved = ++diag_moves;
+        if (button || target != diag_target || moved % 5 == 0) {
+            char name[160];
+            describe(target, name, sizeof(name));
+            droiddeck_log("pointer", "%s at %.1f,%.1f rel %d btn %u pressed %d scene %d,%d", name,
+                          g_ptr_x, g_ptr_y, relative, button, pressed, tx, ty);
+            diag_target = target;
+        }
+    }
     // A button-only input must not replay a cached absolute position. A game
     // may have warped its cursor since the last motion (before taking lock,
     // or while releasing it), so that replay can become an unintended pan.
@@ -2687,6 +2710,12 @@ static void deliver_pointer(const struct input_msg *m) {
     if (y < 0) y = 0;
     if (x > w - 1) x = w - 1;
     if (y > h - 1) y = h - 1;
+    {
+        static int diag_delivered;
+        if (m->p1 != 1 || ++diag_delivered % 5 == 0)
+            droiddeck_log("pointer", "in %d %d,%d out %dx%d scene %dx%d -> %.1f,%.1f", m->p1, m->p2, m->p3,
+                          ow, oh, w, h, x, y);
+    }
     pointer_event(x, y, m->p1 == 1 ? 0 : BTN_LEFT, m->p1 == 0);
 }
 
@@ -2787,6 +2816,7 @@ static void touch_down(int id, double x, double y) {
     struct seat_touch *st;
     int has_touch = 0;
     for_each_touch_of(client, st) has_touch = 1;
+    droiddeck_log("touch", "down %d at %.1f,%.1f", id, x, y);
     if (!any_active) {
         char name[160];
         describe(target, name, sizeof(name));

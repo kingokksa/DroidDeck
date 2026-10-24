@@ -357,6 +357,59 @@ class GameEnvironmentTest(unittest.TestCase):
                 (asylum / name).touch()
             self.assertEqual(MODULE["engine_fixes"](str(asylum / "BmLauncher.exe"), []), ({}, [], []))
 
+    def test_caravan_sandwitch_and_cyberpunk_run_at_feature_level_12_1(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            caravan = Path(tmp) / "Caravan SandWitch"
+            shipping = caravan / "CaravanSandWitch/Binaries/Win64"
+            shipping.mkdir(parents=True)
+            for name in ("CaravanSandWitch.exe", ".droiddeck-launch.bat"):
+                (caravan / name).touch()
+            (shipping / "CaravanSandWitch-Win64-Shipping.exe").touch()
+            cyberpunk = Path(tmp) / "Cyberpunk 2077"
+            (cyberpunk / "bin/x64").mkdir(parents=True)
+            for name in ("REDprelauncher.exe", "bin/x64/Cyberpunk2077.exe"):
+                (cyberpunk / name).touch()
+            games = [caravan / "CaravanSandWitch.exe", caravan / ".droiddeck-launch.bat",
+                     shipping / "CaravanSandWitch-Win64-Shipping.exe",
+                     cyberpunk / "REDprelauncher.exe", cyberpunk / "bin/x64/Cyberpunk2077.exe"]
+            for exe in games:
+                env, extra, notes = MODULE["engine_fixes"](str(exe), [])
+                self.assertEqual((env, extra), ({"VKD3D_FEATURE_LEVEL": "12_1"}, []), exe)
+                self.assertTrue(notes)
+            config = {"version": 1, "shared": {"VKD3D_FEATURE_LEVEL": "12_2"}}
+            self.assertEqual(MODULE["apply_config"]({}, config, "1582650", env)["VKD3D_FEATURE_LEVEL"], "12_1")
+            config["games"] = {"1582650": {"VKD3D_FEATURE_LEVEL": "12_2"}}
+            self.assertEqual(MODULE["apply_config"]({}, config, "1582650", env)["VKD3D_FEATURE_LEVEL"], "12_2")
+            other = Path(tmp) / "Other/Binaries/Win64"
+            other.mkdir(parents=True)
+            (other / "Other-Win64-Shipping.exe").touch()
+            self.assertEqual(MODULE["engine_fixes"](str(other / "Other-Win64-Shipping.exe"), []), ({}, [], []))
+            witcher = Path(tmp) / "The Witcher 3"
+            witcher.mkdir()
+            (witcher / "REDprelauncher.exe").touch()
+            self.assertNotIn("VKD3D_FEATURE_LEVEL", MODULE["engine_fixes"](str(witcher / "REDprelauncher.exe"), [])[0])
+
+    def test_unity_players_keep_tso_over_the_preset(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            def game(*names):
+                for name in names:
+                    (Path(tmp) / name).parent.mkdir(parents=True, exist_ok=True)
+                    (Path(tmp) / name).touch()
+                return str(Path(tmp) / names[0])
+
+            il2cpp = game("Megabonk/Megabonk.x86_64", "Megabonk/UnityPlayer.so", "Megabonk/GameAssembly.so")
+            mono = game("Mono/Game.x86_64", "Mono/UnityPlayer.so")
+            windows = game("Crab Game/Crab Game.exe", "Crab Game/UnityPlayer.dll", "Crab Game/GameAssembly.dll")
+            windows_mono = game("RoR2/Risk of Rain 2.exe", "RoR2/UnityPlayer.dll", "RoR2/MonoBleedingEdge/mono-2.0-bdwgc.dll")
+            for exe in (il2cpp, mono, windows, windows_mono):
+                env, extra, notes = MODULE["engine_fixes"](exe, [])
+                self.assertEqual((env, extra, notes), ({"FEX_TSOENABLED": "1"}, [], ["Unity: FEX with TSO"]))
+            performance = {"version": 1, "shared": {"FEX_TSOENABLED": "0", "FEX_VECTORTSOENABLED": "0"}}
+            result = MODULE["apply_config"]({}, performance, "3405340", env)
+            self.assertEqual((result["FEX_TSOENABLED"], result["FEX_VECTORTSOENABLED"]), ("1", "0"))
+            performance["games"] = {"3405340": {"FEX_TSOENABLED": "0"}}
+            self.assertEqual(MODULE["apply_config"]({}, performance, "3405340", env)["FEX_TSOENABLED"], "0")
+
     def test_a_new_fix_only_needs_registering(self):
         with tempfile.TemporaryDirectory() as tmp:
             (Path(tmp) / "Game.exe").touch()

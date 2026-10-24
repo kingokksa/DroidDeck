@@ -329,6 +329,8 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
     private var glassesSettings by mutableStateOf(Glasses.settings.value)
     private var glassesScreen: GlassesScreen? = null
     private var glassesOutputActive by mutableStateOf(false)
+    private var pausedFrame by mutableStateOf<com.droiddeck.launcher.ui.PausedFrame?>(null)
+    private var pausedFrameWanted = false
     private var trackingRecovery by mutableStateOf<TrackingRecovery?>(null)
     private var glasses3dForVr = false
     private var ended = false
@@ -535,6 +537,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         keyboard = KeyboardHost(this).also { root.addView(it) }
         touchpad = TouchpadGestures(PointerGestures.slop(this), pointerListener)
         directTouchHold = DirectTouchHold(PointerGestures.slop(this), pointerListener) {
+            releaseDirectTouch()
             WaylandCompositor.nativeSendTouch(3, -1, 0, 0)
         }
         threeFingerTap = com.droiddeck.launcher.input.ThreeFingerTap(PointerGestures.slop(this) * 2)
@@ -1013,9 +1016,20 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
                     SessionAchievements(inFront.game, inFront.title, onClose = ::closeAchievements)
                 }
                 com.droiddeck.launcher.ui.AchievementNotificationOverlay()
-                if (SessionState.suspended) SessionPausedOverlay(
+                // Auto and Native resume on their own as the session comes back; only a failed resume needs the button.
+                val autoResume = suspendPolicy == SessionPrefs.SUSPEND_AUTO || suspendPolicy == SessionPrefs.SUSPEND_NATIVE
+                SessionPausedOverlay(
+                    suspended = SessionState.suspended && (!autoResume || SessionState.resumeFailed),
+                    engaged = SessionState.resumeRequested || SessionState.resuming,
+                    failures = SessionState.resumeFailures,
+                    frame = pausedFrame,
                     title = pausedTitle(),
                     onResume = { SessionService.resume(this@SessionActivity) },
+                    onFrameNeeded = ::requestPausedFrame,
+                    onHidden = {
+                        pausedFrame = null
+                        pausedFrameWanted = false
+                    },
                 )
                 if (leaving) com.droiddeck.launcher.ui.FloodSpread(
                     com.droiddeck.launcher.ui.LocalPalette.current.signal,
@@ -1693,7 +1707,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         }
         com.droiddeck.launcher.gpu.DriverSetupLog.write(this, "compositor.start driver=$driverId")
         CompositorHost.startOrAttach(
-            holder.surface, runtimeDir.path,
+            this, holder.surface, runtimeDir.path,
             driverId?.let { turnip.driverPath(it) }, driverId?.let { turnip.libraryName(it) },
             applicationInfo.nativeLibraryDir, size.first, size.second, refreshHz(), outputFpsLimit(),
         )
@@ -1913,6 +1927,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
                 SessionState.relaunch?.let { next ->
                     SessionState.relaunch = null
                     next.putExtra(EXTRA_RETURN_HOME, intent.getBooleanExtra(EXTRA_RETURN_HOME, false))
+                    next.putExtra(EXTRA_LINK_TASK, intent.getIntExtra(EXTRA_LINK_TASK, -1))
                     setIntent(next)
                     recreate()
                     return@runOnUiThread
@@ -2343,12 +2358,22 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         cursorVisible = false
     }
 
-    private fun movePointer(x: Float, y: Float) {
+    private fun movePointer(x: Float, y: Float, localCursor: Boolean = true) {
         val rect = drawnRect() ?: return
         val cx = x.coerceIn(rect.left, rect.right)
         val cy = y.coerceIn(rect.top, rect.bottom)
-        WaylandCompositor.nativeSendPointer(1, InputSpace.x(cx, surfaceView.width), InputSpace.y(cy, surfaceView.height))
-        showCursor(cx, cy)
+        val ix = InputSpace.x(cx, surfaceView.width)
+        val iy = InputSpace.y(cy, surfaceView.height)
+        diagPointerSent("pointer", ix, iy)
+        WaylandCompositor.nativeSendPointer(1, ix, iy)
+        if (localCursor) showCursor(cx, cy)
+    }
+
+    private var diagPointerCount = 0
+
+    private fun diagPointerSent(tag: String, x: Int, y: Int, extra: String = "") {
+        if (++diagPointerCount % 5 != 0) return
+        Log.i(TAG, "diag $tag $x,$y view=${surfaceView.width}x${surfaceView.height} hides=$clientHidesCursor$extra")
     }
 
     private fun showCursor(x: Float, y: Float) {
@@ -2371,7 +2396,9 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         val serial = cursorBuf[0]
         if (serial == 0 || serial == cursorSerial) return false
         cursorSerial = serial
+        val wasHidesCursor = clientHidesCursor
         clientHidesCursor = cursorBuf[1] != 0
+        if (clientHidesCursor != wasHidesCursor) Log.i(TAG, "diag client hides cursor: $clientHidesCursor")
         if (clientHidesCursor) return true
         val w = cursorBuf[2]
         val h = cursorBuf[3]
@@ -2562,11 +2589,22 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
 
     private fun effectiveTouchMode(): String {
         val options = steamTouchOptions
-        if (options == null || steamTouchControls?.visibility != View.VISIBLE) return SessionPrefs.touchMode(this)
+        val touchAppId = com.droiddeck.launcher.input.SteamTouchDevice.current?.state()?.appId
+        val bigPicture = touchAppId == null || touchAppId == 0
+        if (options == null || steamTouchControls?.visibility != View.VISIBLE) {
+            val pref = SessionPrefs.touchMode(this)
+            // A Steam session runs gamescope with touches passed straight through, which a
+            // desktop game ignores: there Auto drives the pointer instead of the finger.
+            if (pref == SessionPrefs.TOUCH_AUTO && SessionState.mode == SessionService.MODE_STEAM && !bigPicture)
+                return SessionPrefs.TOUCH_DIRECT
+            return pref
+        }
         return when {
             options.inputMode == com.droiddeck.launcher.input.SteamTouchConfig.INPUT_CONTROLLER -> SessionPrefs.TOUCH_OFF
             SessionPrefs.touchMode(this) == SessionPrefs.TOUCH_GESTURES -> SessionPrefs.TOUCH_GESTURES
             options.mouseMode == com.droiddeck.launcher.input.SteamTouchConfig.MOUSE_RELATIVE -> SessionPrefs.TOUCH_PAD
+            // Big Picture takes a real finger natively; a game with Steam's mouse mode gets the pointer.
+            bigPicture -> SessionPrefs.TOUCH_AUTO
             else -> SessionPrefs.TOUCH_DIRECT
         }
     }
@@ -2578,13 +2616,15 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
             touchpad.sensitivity = 1.15f * speed
         }
         if (next == routedTouchMode) return
+        Log.i(TAG, "touch routing: $routedTouchMode -> $next")
         if (::touchscreenGestures.isInitialized) touchscreenGestures.cancel()
         gesturePointerReady = false
         if (::touchpad.isInitialized) touchpad.cancel()
         if (::directTouchHold.isInitialized) directTouchHold.cancel()
+        releaseDirectTouch()
         if (::scrollTouch.isInitialized) scrollTouch.cancel()
         if (CompositorHost.isStarted) WaylandCompositor.nativeSendTouch(3, -1, 0, 0)
-        if (next == SessionPrefs.TOUCH_OFF) cursorVisible = false
+        if (next == SessionPrefs.TOUCH_OFF || next == SessionPrefs.TOUCH_DIRECT) cursorVisible = false
         routedTouchMode = next
     }
 
@@ -2613,8 +2653,18 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
     }
 
     private var ignoreGameTouch = false
+    private var directTouchPointer = -1
+    private var directTouchX = 0f
+    private var directTouchY = 0f
+    private var directTouchPressed = false
+    private val directTouchRelease = Runnable {
+        directTouchPressed = false
+        WaylandCompositor.nativeSendSceneInput(3, PointerGestures.BTN_LEFT, 0)
+    }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN || event.actionMasked == MotionEvent.ACTION_POINTER_DOWN)
+            Log.i(TAG, "diag touch src=${event.source} mode=$routedTouchMode steam=${SessionState.mode}/${SessionState.steamUi} touchpad=${usingTouchpad()} lock=$pointerLocked hides=$clientHidesCursor app=${com.droiddeck.launcher.input.SteamTouchDevice.current?.state()?.appId} out=${SessionState.outputSize} pic=$topPictureMapped at=${event.x.toInt()},${event.y.toInt()}")
         if (event.isFromSource(android.view.InputDevice.SOURCE_MOUSE)) return onMouse(event)
         if (drawerOpen || pcKeyboardOpen || achievementsOpen || gestureSettingsOpen || pipUi || SessionState.suspended) return true
         if (routedTouchMode == SessionPrefs.TOUCH_GESTURES) {
@@ -2654,7 +2704,14 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
             if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) ignoreGameTouch = false
             return true
         }
-        if (directTouchHold.onTouch(event)) return true
+        if (routedTouchMode == SessionPrefs.TOUCH_AUTO) {
+            if (directTouchHold.onTouch(event)) return true
+            return nativeTouch(event, rect)
+        }
+        return directTouch(event)
+    }
+
+    private fun nativeTouch(event: MotionEvent, rect: android.graphics.RectF): Boolean {
         fun sendTouch(action: Int, index: Int) {
             val x = event.getX(index).coerceIn(rect.left, rect.right)
             val y = event.getY(index).coerceIn(rect.top, rect.bottom)
@@ -2676,6 +2733,72 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
             else -> return false
         }
         return true
+    }
+
+    private fun directTouch(event: MotionEvent): Boolean {
+        fun place(index: Int) = movePointer(event.getX(index), event.getY(index), localCursor = false)
+        val slop = PointerGestures.slop(this)
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                uiHandler.removeCallbacks(directTouchRelease)
+                directTouchPressed = false
+                directTouchPointer = event.getPointerId(0)
+                WaylandCompositor.nativeSendTouch(3, -1, 0, 0)
+                listOf(PointerGestures.BTN_LEFT, PointerGestures.BTN_RIGHT, PointerGestures.BTN_MIDDLE).forEach {
+                    WaylandCompositor.nativeSendSceneInput(3, it, 0)
+                }
+                place(0)
+                Log.i(TAG, "diag direct down ${event.x.toInt()},${event.y.toInt()}")
+                directTouchX = event.x
+                directTouchY = event.y
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val index = event.findPointerIndex(directTouchPointer)
+                if (index >= 0) {
+                    place(index)
+                    if (!directTouchPressed && (abs(event.getX(index) - directTouchX) > slop ||
+                            abs(event.getY(index) - directTouchY) > slop)) {
+                        directTouchPressed = true
+                        Log.i(TAG, "diag direct press ${event.getX(index).toInt()},${event.getY(index).toInt()}")
+                        WaylandCompositor.nativeSendSceneInput(3, PointerGestures.BTN_LEFT, 1)
+                    }
+                }
+            }
+            MotionEvent.ACTION_POINTER_DOWN -> Unit
+            MotionEvent.ACTION_UP -> {
+                val index = event.findPointerIndex(directTouchPointer)
+                if (index >= 0) place(index)
+                endDirectTouch()
+            }
+            MotionEvent.ACTION_POINTER_UP ->
+                if (event.getPointerId(event.actionIndex) == directTouchPointer) {
+                    place(event.actionIndex)
+                    endDirectTouch()
+                }
+            MotionEvent.ACTION_CANCEL -> releaseDirectTouch()
+            else -> return false
+        }
+        return true
+    }
+
+    private fun endDirectTouch() {
+        if (directTouchPointer < 0) return
+        Log.i(TAG, "diag direct up pressed=$directTouchPressed")
+        directTouchPointer = -1
+        if (directTouchPressed) {
+            directTouchRelease.run()
+        } else {
+            WaylandCompositor.nativeSendSceneInput(3, PointerGestures.BTN_LEFT, 1)
+            directTouchPressed = true
+            uiHandler.postDelayed(directTouchRelease, DIRECT_CLICK_RELEASE_MS)
+        }
+    }
+
+    private fun releaseDirectTouch() {
+        if (directTouchPointer < 0 && !directTouchPressed) return
+        directTouchPointer = -1
+        uiHandler.removeCallbacks(directTouchRelease)
+        if (directTouchPressed) directTouchRelease.run()
     }
 
     private fun onMouse(event: MotionEvent): Boolean {
@@ -2860,6 +2983,50 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         if (down || code !in gestureKeysDown) WaylandCompositor.nativeSendKey(code, if (down) 1 else 0)
     }
 
+    // The frozen game cannot draw again, so the paused overlay shows a copy taken while the surface still holds its frame.
+    private fun capturePausedFrame() {
+        if (!SessionState.running || pipUi || isInPictureInPictureMode || glassesOutputActive) return
+        if (SessionState.suspended && pausedFrame != null) return
+        if (suspendPolicy == SessionPrefs.SUSPEND_NEVER || !::surfaceView.isInitialized) return
+        if (surfaceView.holder.surface?.isValid != true) return
+        val width = surfaceView.width
+        val height = surfaceView.height
+        if (width <= 0 || height <= 0) return
+        val scale = minOf(1f, PAUSED_FRAME_MAX_EDGE / maxOf(width, height).toFloat())
+        val bitmap = try {
+            android.graphics.Bitmap.createBitmap(
+                maxOf(1, (width * scale).toInt()), maxOf(1, (height * scale).toInt()), android.graphics.Bitmap.Config.ARGB_8888,
+            )
+        } catch (_: OutOfMemoryError) {
+            return
+        }
+        val surfaceAt = IntArray(2).also { surfaceView.getLocationInWindow(it) }
+        val overlayAt = IntArray(2).also { sessionOverlay.getLocationInWindow(it) }
+        val left = surfaceAt[0] - overlayAt[0]
+        val top = surfaceAt[1] - overlayAt[1]
+        val bounds = android.graphics.Rect(left, top, left + width, top + height)
+        try {
+            android.view.PixelCopy.request(surfaceView, bitmap, { result ->
+                if (result == android.view.PixelCopy.SUCCESS && !isDestroyed) {
+                    pausedFrame = com.droiddeck.launcher.ui.PausedFrame(bitmap.asImageBitmap(), bounds)
+                    pausedFrameWanted = false
+                } else {
+                    bitmap.recycle()
+                }
+            }, uiHandler)
+        } catch (_: IllegalArgumentException) {
+            bitmap.recycle()
+        }
+    }
+
+    // Sessions that froze from picture-in-picture, or before onPause could copy a frame, have none; the
+    // compositor shows the frozen frame again once its output is back, so copy it from there.
+    private fun requestPausedFrame() {
+        if (pausedFrame != null) return
+        pausedFrameWanted = true
+        if (resumed && surfaceW > 0) capturePausedFrame()
+    }
+
     private fun pipBounds(): android.graphics.Rect {
         val rect = android.graphics.Rect()
         if (!::surfaceView.isInitialized || !surfaceView.getGlobalVisibleRect(rect)) return rect
@@ -2970,6 +3137,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
             return
         }
         if (this.intent.getBooleanExtra(EXTRA_RETURN_HOME, false)) intent.putExtra(EXTRA_RETURN_HOME, true)
+        if (!intent.hasExtra(EXTRA_LINK_TASK)) intent.putExtra(EXTRA_LINK_TASK, this.intent.getIntExtra(EXTRA_LINK_TASK, -1))
         setIntent(intent)
         if (intent.getBooleanExtra(EXTRA_STEAMVR, false) && SessionState.mode == SessionService.MODE_STEAM) {
             SessionState.steamVr = true
@@ -2990,6 +3158,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         }
         applyFollowOrientation(resources.configuration)
         if (runtimeRemovalBlocked) return
+        if (!SessionState.suspended) pausedFrame = null
         com.droiddeck.launcher.ui.Motion.refresh(this)
         refreshHomeApp()
         if (intent?.action == SessionService.ACTION_RESUME) {
@@ -3015,10 +3184,12 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
 
     override fun onPause() {
         if (runtimeRemovalBlocked) { super.onPause(); return }
+        capturePausedFrame()
         sessionClipboard.stop()
         if (::touchscreenGestures.isInitialized) touchscreenGestures.cancel()
         if (::touchpad.isInitialized) touchpad.cancel()
         if (::directTouchHold.isInitialized) directTouchHold.cancel()
+        releaseDirectTouch()
         uiHandler.removeCallbacks(clearRecognizedGesture)
         gestureSettingsOpen = false
         drawerOpen = false
@@ -3253,6 +3424,9 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         surfaceView.visibility = if (glassesOutputActive) View.INVISIBLE else View.VISIBLE
         Log.i(TAG, "compositor output attached: " +
             if (glassesOutputActive) "glasses display ${glassesScreen?.display?.displayId}" else "phone")
+        if (pausedFrameWanted) uiHandler.postDelayed({
+            if (pausedFrameWanted && pausedFrame == null && resumed) capturePausedFrame()
+        }, PAUSED_FRAME_REDRAW_MS)
     }
 
     private fun restorePhoneOutput(screen: GlassesScreen) {
@@ -3487,15 +3661,31 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
             }
             return
         }
-        super.finish()
         if (!closeAtOnce && intent.getBooleanExtra(EXTRA_RETURN_HOME, false)) {
             com.droiddeck.launcher.ui.QuitFlood.take()
             com.droiddeck.launcher.ui.LaunchOrigin.flooding = null
-            startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        }
+            closeLinkTasks()
+            if (!isTaskRoot) moveTaskToBack(true)
+            super.finishAndRemoveTask()
+        } else super.finish()
         if (quitFlooded) overridePendingTransition(0, 0)
         else overridePendingTransition(R.anim.session_hold, R.anim.session_sink)
+    }
+
+    private fun closeLinkTasks() {
+        val linkTask = intent.getIntExtra(EXTRA_LINK_TASK, -1)
+        if (linkTask == -1) return
+        val tasks = runCatching { getSystemService(android.app.ActivityManager::class.java)?.appTasks }.getOrNull().orEmpty()
+        for (task in tasks) {
+            runCatching {
+                val info = task.taskInfo
+                @Suppress("DEPRECATION")
+                val id = if (android.os.Build.VERSION.SDK_INT >= 29) info.taskId else info.persistentId
+                val base = info.baseIntent
+                if (id == linkTask && base.component?.className == FrontEndActivity::class.java.name &&
+                    com.droiddeck.launcher.frontend.GameLaunchIntent.accepts(base.action)) task.finishAndRemoveTask()
+            }
+        }
     }
 
     private fun completeLeave() {
@@ -3509,14 +3699,18 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
 
     companion object {
         const val EXTRA_RETURN_HOME = "returnHome"
+        const val EXTRA_LINK_TASK = "linkTask"
         const val EXTRA_STEAMVR = "steamVr"
         const val EXTRA_REPAIR_RUNTIME = "repairRuntime"
         private const val LEAVE_TIMEOUT_MS = 1_500L
+        private const val PAUSED_FRAME_MAX_EDGE = 1920f
+        private const val PAUSED_FRAME_REDRAW_MS = 150L
         private const val TAG = "SessionActivity"
         private var startedScreens = 0
         private const val FEX_MISSING = "droiddeck-fex: x86 Linux programs need"
         private const val UNBUFFERED_SOURCES = InputDevice.SOURCE_CLASS_JOYSTICK or InputDevice.SOURCE_CLASS_TRACKBALL or InputDevice.SOURCE_CLASS_POSITION
         private const val CURSOR_PAD_HOLD_MS = 1200L
+        private const val DIRECT_CLICK_RELEASE_MS = 50L
         private const val PAD_MOUSE_CHECK_MS = 500L
         private const val PAD_SCROLL_POINTER_X = 0.985f
         private const val PAD_SCROLL_HEIGHTS_PER_S = 3f
