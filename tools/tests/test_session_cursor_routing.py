@@ -31,7 +31,7 @@ class SessionCursorRoutingTest(unittest.TestCase):
         return result.stdout.strip()
 
     def test_steam_leaves_the_cursor_with_the_host_unless_asked(self):
-        self.assertEqual('', self.run_setup('steam'))
+        self.assertEqual('0', self.run_setup('steam'))
 
     def test_steam_composites_the_cursor_when_the_setting_is_on(self):
         self.assertEqual('2', self.run_setup('steam', composite='1'))

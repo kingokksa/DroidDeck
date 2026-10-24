@@ -231,6 +231,10 @@ if [ -z "${BL_INSIDE:-}" ]; then
   # plane on the phone's compositor; a controller-driven cursor is the reason to turn it on.
   if [ "$mode" = steam ] && [ "${BL_CURSOR_COMPOSITE:-0}" = 1 ]; then
     export gamescope_cursor_composite=2
+  elif [ "$mode" = steam ]; then
+    # Mode 1 composites for every window without nested hints while still forwarding
+    # the cursor to the host, so the phone draws a second one.
+    export gamescope_cursor_composite=0
   fi
   args=(--backend wayland --expose-wayland -f -W "$width" -H "$height" -w "$nested" -h "$height")
   [ "$nested" != "$width" ] && args+=(-S stretch) && export BL_STRETCHED=1
