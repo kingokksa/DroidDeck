@@ -2362,8 +2362,18 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         val rect = drawnRect() ?: return
         val cx = x.coerceIn(rect.left, rect.right)
         val cy = y.coerceIn(rect.top, rect.bottom)
-        WaylandCompositor.nativeSendPointer(1, InputSpace.x(cx, surfaceView.width), InputSpace.y(cy, surfaceView.height))
+        val ix = InputSpace.x(cx, surfaceView.width)
+        val iy = InputSpace.y(cy, surfaceView.height)
+        diagPointerSent("pointer", ix, iy)
+        WaylandCompositor.nativeSendPointer(1, ix, iy)
         if (localCursor) showCursor(cx, cy)
+    }
+
+    private var diagPointerCount = 0
+
+    private fun diagPointerSent(tag: String, x: Int, y: Int, extra: String = "") {
+        if (++diagPointerCount % 5 != 0) return
+        Log.i(TAG, "diag $tag $x,$y view=${surfaceView.width}x${surfaceView.height} hides=$clientHidesCursor$extra")
     }
 
     private fun showCursor(x: Float, y: Float) {
@@ -2386,7 +2396,9 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         val serial = cursorBuf[0]
         if (serial == 0 || serial == cursorSerial) return false
         cursorSerial = serial
+        val wasHidesCursor = clientHidesCursor
         clientHidesCursor = cursorBuf[1] != 0
+        if (clientHidesCursor != wasHidesCursor) Log.i(TAG, "diag client hides cursor: $clientHidesCursor")
         if (clientHidesCursor) return true
         val w = cursorBuf[2]
         val h = cursorBuf[3]
@@ -2651,6 +2663,8 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN || event.actionMasked == MotionEvent.ACTION_POINTER_DOWN)
+            Log.i(TAG, "diag touch src=${event.source} mode=$routedTouchMode steam=${SessionState.mode}/${SessionState.steamUi} touchpad=${usingTouchpad()} lock=$pointerLocked hides=$clientHidesCursor app=${com.droiddeck.launcher.input.SteamTouchDevice.current?.state()?.appId} out=${SessionState.outputSize} pic=$topPictureMapped at=${event.x.toInt()},${event.y.toInt()}")
         if (event.isFromSource(android.view.InputDevice.SOURCE_MOUSE)) return onMouse(event)
         if (drawerOpen || pcKeyboardOpen || achievementsOpen || gestureSettingsOpen || pipUi || SessionState.suspended) return true
         if (routedTouchMode == SessionPrefs.TOUCH_GESTURES) {
@@ -2734,6 +2748,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
                     WaylandCompositor.nativeSendSceneInput(3, it, 0)
                 }
                 place(0)
+                Log.i(TAG, "diag direct down ${event.x.toInt()},${event.y.toInt()}")
                 directTouchX = event.x
                 directTouchY = event.y
             }
@@ -2744,6 +2759,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
                     if (!directTouchPressed && (abs(event.getX(index) - directTouchX) > slop ||
                             abs(event.getY(index) - directTouchY) > slop)) {
                         directTouchPressed = true
+                        Log.i(TAG, "diag direct press ${event.getX(index).toInt()},${event.getY(index).toInt()}")
                         WaylandCompositor.nativeSendSceneInput(3, PointerGestures.BTN_LEFT, 1)
                     }
                 }
@@ -2767,6 +2783,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
 
     private fun endDirectTouch() {
         if (directTouchPointer < 0) return
+        Log.i(TAG, "diag direct up pressed=$directTouchPressed")
         directTouchPointer = -1
         if (directTouchPressed) {
             directTouchRelease.run()
