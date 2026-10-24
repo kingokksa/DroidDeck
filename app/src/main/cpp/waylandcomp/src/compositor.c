@@ -2193,7 +2193,10 @@ static void pointer_focus(struct wl_resource *target, wl_fixed_t fx, wl_fixed_t 
         wl_pointer_send_enter(sp->ptr, wl_display_next_serial(g_display), target, fx, fy);
         entered = 1;
     }
-    if (entered) constraints_focus_entered(target, client);
+    if (entered) {
+        droiddeck_log("pointer", "DBG enter sent for %s at %d,%d", target ? "target" : "?", wl_fixed_to_int(fx), wl_fixed_to_int(fy));
+        constraints_focus_entered(target, client);
+    }
 }
 
 static void keyboard_focus(struct wl_resource *target) {
@@ -2613,15 +2616,16 @@ static void pointer_input(double x, double y, int relative, uint32_t button, int
     }
     if (!target) return;
 
-    if (button)
-        droiddeck_log("pointer", "DBG %s %x rel:%d ptr %.0f,%.0f target %s at %d,%d grab %s",
-                      pressed ? "press" : "release", button, relative, g_ptr_x, g_ptr_y,
-                      target->title ? target->title : "?", target->x, target->y,
-                      g_grab && g_grab->title ? g_grab->title : "-");
-
     struct wl_client *client = wl_resource_get_client(target->resource);
     struct seat_pointer *sp;
-    if (!pointer_for(client)) return;
+    struct seat_pointer *any = pointer_for(client);
+    if (button)
+        droiddeck_log("pointer", "DBG %s %x rel:%d ptr %.0f,%.0f target %s grab %s ptrs %d mine %s itsfocus %s",
+                      pressed ? "press" : "release", button, relative, g_ptr_x, g_ptr_y,
+                      target->title ? target->title : "?",
+                      g_grab && g_grab->title ? g_grab->title : "-", g_nptrs,
+                      any ? "yes" : "NO", any && any->focus == target->resource ? "yes" : "NO");
+    if (!any) return;
     int tx = 0, ty = 0;
     if (target != g_desktop && target->placed) { tx = target->x; ty = target->y; }
     wl_fixed_t fx = wl_fixed_from_double(g_ptr_x - tx), fy = wl_fixed_from_double(g_ptr_y - ty);
@@ -2635,13 +2639,18 @@ static void pointer_input(double x, double y, int relative, uint32_t button, int
     if (!(k && k->is_lock) && (!relative || dx != 0 || dy != 0))
         for_each_pointer_of(client, sp) wl_pointer_send_motion(sp->ptr, t, fx, fy);
     send_relative_motion(client, dx, dy);
+    int DBG_sent = 0;
     for_each_pointer_of(client, sp) {
-        if (button)
+        if (button) {
+            DBG_sent++;
             wl_pointer_send_button(sp->ptr, wl_display_next_serial(g_display), t, button,
                                    pressed ? WL_POINTER_BUTTON_STATE_PRESSED : WL_POINTER_BUTTON_STATE_RELEASED);
+        }
         if (wl_resource_get_version(sp->ptr) >= WL_POINTER_FRAME_SINCE_VERSION)
             wl_pointer_send_frame(sp->ptr);
     }
+    if (button)
+        droiddeck_log("pointer", "DBG button %x %s delivered to %d", button, pressed ? "press" : "release", DBG_sent);
     if (button && pressed && !(k && k->is_lock)) {
         struct surface *clicked = toplevel_at(g_ptr_x, g_ptr_y);
         if (clicked) g_ime_click = clicked;
