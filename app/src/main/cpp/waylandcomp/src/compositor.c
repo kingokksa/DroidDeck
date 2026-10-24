@@ -2667,8 +2667,6 @@ static void pointer_button(uint32_t button, int pressed) {
     // pointer focus without motion or hit-testing: native touch has independent
     // coordinates, so replaying g_ptr_x/y here can warp the game cursor.
     uint32_t t = now_ms();
-    droiddeck_log("pointer", "DBG release %x ptr %.0f,%.0f focus %s", button, g_ptr_x, g_ptr_y,
-                  g_nptrs > 0 && g_ptrs[0].focus ? "yes" : "no");
     for (int i = 0; i < g_nptrs; i++) {
         struct seat_pointer *sp = &g_ptrs[i];
         if (!sp->focus) continue;
