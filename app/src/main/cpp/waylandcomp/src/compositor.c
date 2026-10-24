@@ -2598,6 +2598,11 @@ static void pointer_input(double x, double y, int relative, uint32_t button, int
 
     if (k && k->is_lock) {
         target = k->surface;
+        // A program that holds the pointer still needs the absolute position of
+        // a touch, otherwise its cursor sits frozen where the lock was taken.
+        if (!relative) {
+            g_ptr_x = x; g_ptr_y = y;
+        }
     } else {
         if (relative) {
             int w, h;
@@ -2654,7 +2659,7 @@ static void pointer_input(double x, double y, int relative, uint32_t button, int
     // may have warped its cursor since the last motion (before taking lock,
     // or while releasing it), so that replay can become an unintended pan.
     // Absolute touch events still carry their position, including on clicks.
-    if (!(k && k->is_lock) && (!relative || dx != 0 || dy != 0))
+    if (!relative || (!(k && k->is_lock) && (dx != 0 || dy != 0)))
         for_each_pointer_of(client, sp) wl_pointer_send_motion(sp->ptr, t, fx, fy);
     send_relative_motion(client, dx, dy);
     for_each_pointer_of(client, sp) {
