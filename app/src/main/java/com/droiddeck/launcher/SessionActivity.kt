@@ -197,6 +197,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
     private lateinit var touchscreenGestures: TouchscreenGestures
     private var gestureConfig = com.droiddeck.launcher.input.TouchGestureConfig()
     private var gestureGame: String? = null
+    private var gameFocused = false
     private var gestureSettingsOpen by mutableStateOf(false)
     private var recognizedGesture by mutableStateOf<TouchscreenGestures.Gesture?>(null)
     private var gesturePointerX = 0f
@@ -742,6 +743,8 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
                         }
                     }
                     if (nextGame != gestureGame) { gestureGame = nextGame; refreshGestureConfig() }
+                    val focused = nextGame != null
+                    if (focused != gameFocused) { gameFocused = focused; applyTouchRouting() }
                 }
                 LaunchedEffect(drawerOpen, pcKeyboardOpen, achievementsOpen, gestureSettingsOpen, pipUi, SessionState.suspended) {
                     if (drawerOpen || pcKeyboardOpen || achievementsOpen || gestureSettingsOpen || pipUi || SessionState.suspended) {
@@ -2601,9 +2604,10 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
 
     private fun effectiveTouchMode(): String {
         val options = steamTouchOptions
-        val touchAppId = com.droiddeck.launcher.input.SteamTouchDevice.current?.state()?.appId
-        val inGame = touchAppId != null && touchAppId != 0
-        val steamUiUp = touchAppId != null && !inGame
+        // Steam's touch reports only carry an app id once its on-screen touch controls are plugged
+        // in, so the compositor focus is what tells a running game from Big Picture.
+        val inGame = gameFocused
+        val steamUiUp = !inGame
         if (options == null || steamTouchControls?.visibility != View.VISIBLE) {
             val pref = SessionPrefs.touchMode(this)
             // A Steam session runs gamescope with touches passed straight through, which a
@@ -2710,7 +2714,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (event.actionMasked == MotionEvent.ACTION_DOWN || event.actionMasked == MotionEvent.ACTION_POINTER_DOWN)
-            Log.i(TAG, "diag touch src=${event.source} mode=$routedTouchMode steam=${SessionState.mode}/${SessionState.steamUi} touchpad=${usingTouchpad()} lock=$pointerLocked hides=$clientHidesCursor app=${com.droiddeck.launcher.input.SteamTouchDevice.current?.state()?.appId} out=${SessionState.outputSize} pic=$topPictureMapped at=${event.x.toInt()},${event.y.toInt()}")
+            Log.i(TAG, "diag touch src=${event.source} mode=$routedTouchMode steam=${SessionState.mode}/${SessionState.steamUi} touchpad=${usingTouchpad()} lock=$pointerLocked hides=$clientHidesCursor app=${com.droiddeck.launcher.input.SteamTouchDevice.current?.state()?.appId} out=${SessionState.outputSize} pic=$topPictureMapped game=$gameFocused at=${event.x.toInt()},${event.y.toInt()}")
         if (event.isFromSource(android.view.InputDevice.SOURCE_MOUSE)) return onMouse(event)
         if (drawerOpen || pcKeyboardOpen || achievementsOpen || gestureSettingsOpen || pipUi || SessionState.suspended) return true
         if (routedTouchMode == SessionPrefs.TOUCH_GESTURES) {
