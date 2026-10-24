@@ -67,19 +67,18 @@ class SessionTouchRoutingTest {
     }
 
     @Test fun aRunningGameRoutesAutoToThePointerInAndOutOfTheSteamLayout() {
-        val buffer = ReflectionHelpers.getField<java.nio.ByteBuffer>(SteamTouchDevice.current!!, "buffer")
-        buffer.putInt(76, 1234)
         try {
             for (visible in listOf(View.VISIBLE, View.GONE)) {
                 for (mode in listOf(SessionPrefs.TOUCH_AUTO, SessionPrefs.TOUCH_DIRECT)) {
                     SessionPrefs.setTouchMode(activity, mode)
                     steam.visibility = visible
+                    field("gameFocused", true)
                     invoke("readPrefs")
                     assertEquals(SessionPrefs.TOUCH_DIRECT, ReflectionHelpers.getField<String>(activity, "routedTouchMode"))
                 }
             }
         } finally {
-            buffer.putInt(76, 0)
+            field("gameFocused", false)
         }
         SessionPrefs.setTouchMode(activity, SessionPrefs.TOUCH_AUTO)
         steam.visibility = View.GONE
