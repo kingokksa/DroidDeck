@@ -535,6 +535,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         keyboard = KeyboardHost(this).also { root.addView(it) }
         touchpad = TouchpadGestures(PointerGestures.slop(this), pointerListener)
         directTouchHold = DirectTouchHold(PointerGestures.slop(this), pointerListener) {
+            releaseDirectTouch()
             WaylandCompositor.nativeSendTouch(3, -1, 0, 0)
         }
         threeFingerTap = com.droiddeck.launcher.input.ThreeFingerTap(PointerGestures.slop(this) * 2)
@@ -2582,6 +2583,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         gesturePointerReady = false
         if (::touchpad.isInitialized) touchpad.cancel()
         if (::directTouchHold.isInitialized) directTouchHold.cancel()
+        releaseDirectTouch()
         if (::scrollTouch.isInitialized) scrollTouch.cancel()
         if (CompositorHost.isStarted) WaylandCompositor.nativeSendTouch(3, -1, 0, 0)
         if (next == SessionPrefs.TOUCH_OFF) cursorVisible = false
@@ -2613,6 +2615,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
     }
 
     private var ignoreGameTouch = false
+    private var directTouchPointer = -1
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (event.isFromSource(android.view.InputDevice.SOURCE_MOUSE)) return onMouse(event)
@@ -2654,7 +2657,15 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
             if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) ignoreGameTouch = false
             return true
         }
+        if (routedTouchMode == SessionPrefs.TOUCH_AUTO) {
+            if (directTouchHold.onTouch(event)) return true
+            return nativeTouch(event, rect)
+        }
         if (directTouchHold.onTouch(event)) return true
+        return directTouch(event)
+    }
+
+    private fun nativeTouch(event: MotionEvent, rect: android.graphics.RectF): Boolean {
         fun sendTouch(action: Int, index: Int) {
             val x = event.getX(index).coerceIn(rect.left, rect.right)
             val y = event.getY(index).coerceIn(rect.top, rect.bottom)
@@ -2676,6 +2687,45 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
             else -> return false
         }
         return true
+    }
+
+    private fun directTouch(event: MotionEvent): Boolean {
+        fun place(index: Int) = movePointer(event.getX(index), event.getY(index))
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                directTouchPointer = event.getPointerId(0)
+                WaylandCompositor.nativeSendTouch(3, -1, 0, 0)
+                listOf(PointerGestures.BTN_LEFT, PointerGestures.BTN_RIGHT, PointerGestures.BTN_MIDDLE).forEach {
+                    WaylandCompositor.nativeSendSceneInput(3, it, 0)
+                }
+                place(0)
+                WaylandCompositor.nativeSendSceneInput(3, PointerGestures.BTN_LEFT, 1)
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val index = event.findPointerIndex(directTouchPointer)
+                if (index >= 0) place(index)
+            }
+            MotionEvent.ACTION_POINTER_DOWN -> Unit
+            MotionEvent.ACTION_UP -> {
+                val index = event.findPointerIndex(directTouchPointer)
+                if (index >= 0) place(index)
+                releaseDirectTouch()
+            }
+            MotionEvent.ACTION_POINTER_UP ->
+                if (event.getPointerId(event.actionIndex) == directTouchPointer) {
+                    place(event.actionIndex)
+                    releaseDirectTouch()
+                }
+            MotionEvent.ACTION_CANCEL -> releaseDirectTouch()
+            else -> return false
+        }
+        return true
+    }
+
+    private fun releaseDirectTouch() {
+        if (directTouchPointer < 0) return
+        directTouchPointer = -1
+        WaylandCompositor.nativeSendSceneInput(3, PointerGestures.BTN_LEFT, 0)
     }
 
     private fun onMouse(event: MotionEvent): Boolean {
