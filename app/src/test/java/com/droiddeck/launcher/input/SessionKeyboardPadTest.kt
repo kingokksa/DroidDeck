@@ -88,7 +88,7 @@ class SessionKeyboardPadTest {
         update()
         assertEquals(View.GONE, steam.visibility)
         assertTrue(SteamTouchDevice.current!!.plugged)
-        assertEquals(SessionPrefs.TOUCH_DIRECT, routedTouchMode())
+        assertEquals(SessionPrefs.TOUCH_AUTO, routedTouchMode())
         steamKeyboard(false)
         update()
         assertEquals(View.VISIBLE, steam.visibility)
