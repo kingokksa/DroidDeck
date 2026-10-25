@@ -2515,6 +2515,62 @@ __attribute__((constructor)) static void note_mouse_preload() {
               ring ? static_cast<int>(__atomic_load_n(&ring->plugged, __ATOMIC_ACQUIRE)) : -1);
 }
 
+__attribute__((visibility("hidden"))) static void wide_to_ascii(const void *source, char *out, size_t size) {
+  if (!size) return;
+  if (!source) {
+    out[0] = 0;
+    return;
+  }
+  auto *text = static_cast<const uint16_t *>(source);
+  size_t i = 0;
+  for (; i + 1 < size && text[i]; ++i) out[i] = text[i] < 0x80 ? static_cast<char>(text[i]) : '?';
+  out[i] = 0;
+}
+
+EXPORT int MessageBoxW(void *window, const void *text, const void *caption, unsigned int type) {
+  static auto real = reinterpret_cast<int (*)(void *, const void *, const void *, unsigned int)>(dlsym(RTLD_NEXT, "MessageBoxW"));
+  char body[256], title[128];
+  wide_to_ascii(text, body, sizeof(body));
+  wide_to_ascii(caption, title, sizeof(title));
+  Logger::log("dialog: \"%s\" says \"%s\"\n", title, body);
+  return real ? real(window, text, caption, type) : 1;
+}
+
+EXPORT int MessageBoxA(void *window, const char *text, const char *caption, unsigned int type) {
+  static auto real = reinterpret_cast<int (*)(void *, const char *, const char *, unsigned int)>(dlsym(RTLD_NEXT, "MessageBoxA"));
+  Logger::log("dialog: \"%s\" says \"%s\"\n", caption ? caption : "", text ? text : "");
+  return real ? real(window, text, caption, type) : 1;
+}
+
+__attribute__((visibility("hidden"))) static bool mentions(const char *text, const char *needle) {
+  return text && strcasestr(text, needle);
+}
+
+__attribute__((visibility("hidden"))) static void note_hidraw_probe(const char *how, const char *path) {
+  if (!path || !strstr(path, "hidraw") || process_is_steam_client()) return;
+  static std::mutex mutex;
+  static std::unordered_map<std::string, int> seen;
+  std::lock_guard<std::mutex> guard(mutex);
+  if (seen.size() > 96) return;
+  std::string key = std::string(self_comm()) + " " + how + " " + path;
+  if (seen[key]++ > 0) return;
+  Logger::log("sysfs: %s %s %s\n", self_comm(), how, path);
+}
+
+EXPORT int execve(const char *path, char *const argv[], char *const envp[]) {
+  bool interesting = mentions(path, ".exe") || mentions(path, "wine") || mentions(path, "upc") || mentions(path, "uplay");
+  if (!interesting && argv)
+    for (int i = 0; i < 3 && argv[i]; ++i)
+      if (mentions(argv[i], ".exe") || mentions(argv[i], "uplay://")) {
+        interesting = true;
+        break;
+      }
+  if (interesting)
+    Logger::log("spawn: %s <- %s %s %s\n", path ? path : "?", argv && argv[0] ? argv[0] : "",
+                argv && argv[1] ? argv[1] : "", argv && argv[2] ? argv[2] : "");
+  return static_cast<int>(syscall(SYS_execve, path, argv, envp));
+}
+
 static constexpr long SYSFS_FS_MAGIC = 0x62656572;
 
 __attribute__((visibility("hidden"))) static const char *deck_listing_dir() {
@@ -3162,6 +3218,7 @@ EXPORT int statx(int dirfd, const char *path, int flags, unsigned mask, struct s
 
 EXPORT DIR *opendir(const char *name) {
   static auto real = reinterpret_cast<DIR *(*)(const char *)>(dlsym(RTLD_NEXT, "opendir"));
+  note_hidraw_probe("lists", name);
   DIR *dir = real(name);
   if (!dir) {
     note_sys_failure(AT_FDCWD, name);
@@ -3172,6 +3229,7 @@ EXPORT DIR *opendir(const char *name) {
 }
 
 EXPORT int open(const char *pathname, int flags, ...) {
+  note_hidraw_probe("opens", pathname);
   va_list va;
   mode_t mode;
   int fd;
@@ -3251,6 +3309,7 @@ EXPORT int open(const char *pathname, int flags, ...) {
 }
 
 EXPORT int openat(int dirfd, const char *pathname, int flags, ...) {
+  note_hidraw_probe("opens", pathname);
   va_list va;
   mode_t mode;
   int fd;
@@ -3456,6 +3515,7 @@ static int real_fstat(int fd, struct stat *buf) {
 }
 
 EXPORT int stat(const char *pathname, struct stat *statbuf) {
+  note_hidraw_probe("stats", pathname);
   return fake_stat_path(pathname, statbuf, real_stat);
 }
 
@@ -3464,6 +3524,7 @@ EXPORT int fstat(int fd, struct stat *buf) {
 }
 
 EXPORT int access(const char *pathname, int mode) {
+  note_hidraw_probe("checks", pathname);
   static auto my_access = reinterpret_cast<decltype(&::access)>(dlsym(RTLD_NEXT, "access"));
   if (fake_uinput_enabled() && is_uinput_path(pathname)) return 0;
   if (is_deck_hidraw_path(pathname) && process_is_steam_client()) return 0;

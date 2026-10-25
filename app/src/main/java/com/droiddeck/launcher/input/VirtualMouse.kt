@@ -124,7 +124,7 @@ class VirtualMouse private constructor(private val map: ByteBuffer) {
                 opener[i] = byte
             }
             val name = String(opener, Charsets.UTF_8).trim()
-            return "mouse opened $opened, sent $sent" + (if (name.isEmpty()) "" else ", by \"$name\"")
+            return "mouse opened $opened, sent $sent" + (if (name.isEmpty() || opened == 0) "" else ", by \"$name\"")
         }
 
         @Synchronized
