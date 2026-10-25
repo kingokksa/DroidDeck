@@ -170,7 +170,8 @@ object SteamDeckPad {
             padNodes[MINOR] = HIDRAW
 
             val listing = listingDir(sessionRoot)
-            for (name in listOf("sys/bus", "sys/class", "sys/devices", "class/hidraw", "bus")) File(listing, name).mkdirs()
+            for (name in listOf("sys/bus", "sys/class", "sys/devices", "bus")) File(listing, name).mkdirs()
+            link(File(listing, "class/hidraw"), "/sys/class/hidraw")
             link(File(LinuxRuntime.liveDir(context), "drm/sys/$MAJOR:$MINOR"), HIDRAW)
 
             val udevData = File(LinuxRuntime.rootDir(context), "run/udev/data").apply { mkdirs() }

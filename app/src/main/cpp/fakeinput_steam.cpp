@@ -2547,11 +2547,16 @@ __attribute__((visibility("hidden"))) static bool mentions(const char *text, con
 }
 
 __attribute__((visibility("hidden"))) static void note_hidraw_probe(const char *how, const char *path) {
-  if (!path || !strstr(path, "hidraw") || process_is_steam_client()) return;
+  if (!path || process_is_steam_client()) return;
+  bool wanted = strstr(path, "hidraw") || !strncmp(path, "/dev/input/event", 16) ||
+                !strcmp(path, "/sys") || !strcmp(path, "/sys/class") || !strcmp(path, "/sys/bus") ||
+                !strcmp(path, "/sys/devices") || !strcmp(path, "/sys/class/input") ||
+                !strcmp(path, "/sys/bus/hid") || !strcmp(path, "/sys/bus/usb");
+  if (!wanted) return;
   static std::mutex mutex;
   static std::unordered_map<std::string, int> seen;
   std::lock_guard<std::mutex> guard(mutex);
-  if (seen.size() > 96) return;
+  if (seen.size() > 200) return;
   std::string key = std::string(self_comm()) + " " + how + " " + path;
   if (seen[key]++ > 0) return;
   Logger::log("sysfs: %s %s %s\n", self_comm(), how, path);
@@ -3133,7 +3138,7 @@ __attribute__((visibility("hidden"))) static std::string note_sys_failure(int di
 
 __attribute__((visibility("hidden"))) static std::string deck_listing_for(const char *path) {
   const char *listing = deck_listing_dir();
-  if (!path || !listing || errno != EACCES || !fake_deck_enabled() || !process_is_steam_client()) return {};
+  if (!path || !listing || errno != EACCES || !fake_deck_enabled()) return {};
   std::string p(path);
   while (p.size() > 1 && p.back() == '/') p.pop_back();
   int which = p == "/sys" ? 0 : p == "/sys/class" ? 1 : p == "/sys/bus" ? 2 : -1;
