@@ -2302,12 +2302,16 @@ struct MouseRingFile {
   uint8_t report[MOUSE_REPORT_BYTES];
   uint32_t plugged;
   uint32_t opened;
+  uint32_t sent;
+  char opener[16];
 };
 static constexpr uint32_t MOUSE_RING_MAGIC = 0x3145534d;
 static constexpr size_t MOUSE_RING_SIZE = 256;
 static_assert(offsetof(MouseRingFile, report) == 16, "MouseRingFile layout");
 static_assert(offsetof(MouseRingFile, plugged) == 20, "MouseRingFile layout");
 static_assert(offsetof(MouseRingFile, opened) == 24, "MouseRingFile layout");
+static_assert(offsetof(MouseRingFile, sent) == 28, "MouseRingFile layout");
+static_assert(offsetof(MouseRingFile, opener) == 32, "MouseRingFile layout");
 
 __attribute__((visibility("hidden"))) static MouseRingFile *mouse_ring() {
   static MouseRingFile *ring = nullptr;
@@ -2342,12 +2346,24 @@ __attribute__((visibility("hidden"))) static bool is_mouse_hidraw_path(const cha
   return pathname && !strcmp(pathname, MOUSE_HIDRAW_PATH) && mouse_plugged();
 }
 
-__attribute__((visibility("hidden"))) static void mouse_state(void (*write)(MouseRingFile &)) {
+template <typename F> __attribute__((visibility("hidden"))) static void mouse_state(F &&write) {
   MouseRingFile *ring = mouse_ring();
   if (!ring) return;
   static std::mutex mutex;
   std::lock_guard<std::mutex> guard(mutex);
   write(*ring);
+}
+
+__attribute__((visibility("hidden"))) static void note_mouse_opener() {
+  int fd = static_cast<int>(syscall(SYS_openat, AT_FDCWD, "/proc/self/comm", O_RDONLY | O_CLOEXEC));
+  if (fd < 0) return;
+  char comm[16] = {};
+  ssize_t n = syscall(SYS_read, fd, comm, sizeof(comm) - 1);
+  syscall(SYS_close, fd);
+  if (n <= 0) return;
+  for (ssize_t i = 0; i < n; ++i)
+    if (comm[i] == '\n') comm[i] = 0;
+  mouse_state([&](MouseRingFile &r) { memcpy(r.opener, comm, sizeof(r.opener)); });
 }
 
 __attribute__((visibility("hidden"))) static void *mouse_report_thread(void *arg) {
@@ -2365,6 +2381,7 @@ __attribute__((visibility("hidden"))) static void *mouse_report_thread(void *arg
       if (send(self->peer, report, sizeof(report), MSG_DONTWAIT | MSG_NOSIGNAL) < 0 &&
           errno != EAGAIN && errno != EWOULDBLOCK)
         break;
+      mouse_state([](MouseRingFile &r) { r.sent++; });
     }
     sleep_us(MOUSE_POLL_INTERVAL_US);
   }
@@ -2393,6 +2410,7 @@ __attribute__((visibility("hidden"))) static int open_mouse_hidraw(int flags) {
     watch_fd(pair[0]);
   }
   mouse_state([](MouseRingFile &r) { r.opened++; });
+  note_mouse_opener();
   pthread_t thread;
   auto *arg = new std::shared_ptr<DeckHidraw>(mouse);
   if (pthread_create(&thread, nullptr, mouse_report_thread, arg) != 0) {

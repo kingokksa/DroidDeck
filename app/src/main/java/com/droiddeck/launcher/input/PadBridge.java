@@ -645,11 +645,13 @@ public final class PadBridge {
 
     private synchronized void logStats() {
         statsScheduled = false;
+        String mouse = VirtualMouse.stats();
         Log.i(TAG, "[input] last 10 s: pad " + statButtons + " buttons, " + statAxes + " axis events"
                 + (statDevice != null ? " (\"" + statDevice + "\")" : "")
                 + ", on-screen " + statOnScreen
                 + (statDropped > 0 ? ", " + statDropped + " NOT delivered (ring closed)" : "")
-                + "; ring " + (open ? "open" : "closed") + ", deck pad " + SessionState.getDeckPad());
+                + "; ring " + (open ? "open" : "closed") + ", deck pad " + SessionState.getDeckPad()
+                + (mouse != null ? "; " + mouse : ""));
         statButtons = statAxes = statOnScreen = statDropped = 0;
     }
 

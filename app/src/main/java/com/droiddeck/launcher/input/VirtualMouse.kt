@@ -76,6 +76,8 @@ class VirtualMouse private constructor(private val map: ByteBuffer) {
         private const val OFF_REPORT = 16
         private const val OFF_PLUGGED = 20
         private const val OFF_OPENED = 24
+        private const val OFF_SENT = 28
+        private const val OFF_OPENER = 32
 
         @Volatile
         private var current: VirtualMouse? = null
@@ -108,6 +110,21 @@ class VirtualMouse private constructor(private val map: ByteBuffer) {
         @JvmStatic
         fun send(type: Int, a: Int, b: Int) {
             current?.handle(type, a, b)
+        }
+
+        @JvmStatic
+        fun stats(): String? {
+            val map = current?.map ?: return null
+            val opened = map.getInt(OFF_OPENED)
+            val sent = map.getInt(OFF_SENT)
+            val opener = ByteArray(16)
+            for (i in opener.indices) {
+                val byte = map.get(OFF_OPENER + i)
+                if (byte.toInt() == 0) break
+                opener[i] = byte
+            }
+            val name = String(opener, Charsets.UTF_8).trim()
+            return "mouse opened $opened, sent $sent" + (if (name.isEmpty()) "" else ", by \"$name\"")
         }
 
         @Synchronized
