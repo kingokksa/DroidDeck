@@ -2,6 +2,8 @@ package com.droiddeck.launcher.wayland;
 
 import android.view.Surface;
 
+import com.droiddeck.launcher.input.VirtualMouse;
+
 public final class WaylandCompositor {
     static {
         System.loadLibrary("droiddeckwayland");
@@ -290,6 +292,11 @@ public final class WaylandCompositor {
 
     public static native void nativeSendSceneInput(int type, int a, int b);
 
+    public static void sendSceneInput(int type, int a, int b) {
+        nativeSendSceneInput(type, a, b);
+        VirtualMouse.send(type, a, b);
+    }
+
     public static final int FG_ENGINE_LSFG = 0, FG_ENGINE_DDFG = 1;
 
     public static native void nativeSetFrameGenEngine(int kind);
@@ -316,12 +323,12 @@ public final class WaylandCompositor {
 
     public static void sendPointerDelta(int dx, int dy) {
         if (dx == 0 && dy == 0) return;
-        nativeSendSceneInput(6, dx * 256, dy * 256);
+        sendSceneInput(6, dx * 256, dy * 256);
     }
 
     public static void sendPointerDelta(float dx, float dy) {
         int x = Math.round(dx * 256f), y = Math.round(dy * 256f);
         if (x == 0 && y == 0) return;
-        nativeSendSceneInput(6, x, y);
+        sendSceneInput(6, x, y);
     }
 }

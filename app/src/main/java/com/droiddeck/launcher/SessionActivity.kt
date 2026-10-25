@@ -1478,7 +1478,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
             if (CompositorHost.isStarted) {
                 WaylandCompositor.nativeSendTouch(3, -1, 0, 0)
                 listOf(PointerGestures.BTN_LEFT, PointerGestures.BTN_RIGHT, PointerGestures.BTN_MIDDLE).forEach {
-                    WaylandCompositor.nativeSendSceneInput(3, it, 0)
+                    WaylandCompositor.sendSceneInput(3, it, 0)
                 }
             }
             if (nextTouchMode == SessionPrefs.TOUCH_OFF || !usingTouchpad()) cursorVisible = false
@@ -2251,7 +2251,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
             } else moveTo(gesturePointerX + dx, gesturePointerY + dy)
         }
         override fun button(code: Int, down: Boolean) {
-            WaylandCompositor.nativeSendSceneInput(3, code, if (down) 1 else 0)
+            WaylandCompositor.sendSceneInput(3, code, if (down) 1 else 0)
         }
         override fun prepareRelativePan() {
             if (pointerLocked) return
@@ -2265,7 +2265,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
             if (down) gestureKeysDown.add(code) else gestureKeysDown.remove(code)
             if (code !in guestKeysDown) WaylandCompositor.nativeSendKey(code, if (down) 1 else 0)
         }
-        override fun wheel(steps: Int) { WaylandCompositor.nativeSendSceneInput(4, steps, 0) }
+        override fun wheel(steps: Int) { WaylandCompositor.sendSceneInput(4, steps, 0) }
         override fun showKeyboard() { uiHandler.post { touchscreenGestures.cancel(); togglePcKeyboard() } }
         override fun gesture(gesture: TouchscreenGestures.Gesture) {
             recognizedGesture = gesture
@@ -2280,9 +2280,9 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         }
         override fun onButton(button: Int, pressed: Boolean, x: Float, y: Float) {
             if (!pointerLocked) movePointer(x, y)
-            WaylandCompositor.nativeSendSceneInput(3, button, if (pressed) 1 else 0)
+            WaylandCompositor.sendSceneInput(3, button, if (pressed) 1 else 0)
         }
-        override fun onWheel(steps: Int) { WaylandCompositor.nativeSendSceneInput(4, steps, 0) }
+        override fun onWheel(steps: Int) { WaylandCompositor.sendSceneInput(4, steps, 0) }
         override fun onLongPress() {
             @Suppress("DEPRECATION")
             (getSystemService(VIBRATOR_SERVICE) as? android.os.Vibrator)?.vibrate(15)
@@ -2298,7 +2298,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
             cursorVisible = false
         }
         override fun onButton(button: Int, pressed: Boolean) {
-            WaylandCompositor.nativeSendSceneInput(3, button, if (pressed) 1 else 0)
+            WaylandCompositor.sendSceneInput(3, button, if (pressed) 1 else 0)
         }
         override fun onScroll(dx: Float, dy: Float) {
             val rect = drawnRect() ?: return
@@ -2310,7 +2310,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
             if (h == 0 && v == 0) return
             scrollRestX -= h
             scrollRestY -= v
-            WaylandCompositor.nativeSendSceneInput(11, ScrollTouchGestures.wheelUnits(v, out.second), ScrollTouchGestures.wheelUnits(h, out.first))
+            WaylandCompositor.sendSceneInput(11, ScrollTouchGestures.wheelUnits(v, out.second), ScrollTouchGestures.wheelUnits(h, out.first))
         }
         override fun onLongPress() = pointerListener.onLongPress()
     }
@@ -2465,9 +2465,9 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
                 this, target,
                 sendPointer = ::moveSecondScreenPointer,
                 sendButton = { button, pressed ->
-                    WaylandCompositor.nativeSendSceneInput(3, button, if (pressed) 1 else 0)
+                    WaylandCompositor.sendSceneInput(3, button, if (pressed) 1 else 0)
                 },
-                sendWheel = { steps -> WaylandCompositor.nativeSendSceneInput(4, steps, 0) },
+                sendWheel = { steps -> WaylandCompositor.sendSceneInput(4, steps, 0) },
                 onSteamMenu = ::tapSteamButton,
                 onQam = ::tapQam,
                 onClose = { selectSecondScreenMode(SecondScreenMode.NONE) },
@@ -2680,7 +2680,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
             MotionEvent.ACTION_DOWN -> {
                 WaylandCompositor.nativeSendTouch(3, -1, 0, 0)
                 listOf(PointerGestures.BTN_LEFT, PointerGestures.BTN_RIGHT, PointerGestures.BTN_MIDDLE).forEach {
-                    WaylandCompositor.nativeSendSceneInput(3, it, 0)
+                    WaylandCompositor.sendSceneInput(3, it, 0)
                 }
                 sendTouch(0, event.actionIndex)
             }
@@ -2704,11 +2704,11 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
                     MotionEvent.BUTTON_TERTIARY -> PointerGestures.BTN_MIDDLE
                     else -> PointerGestures.BTN_LEFT
                 }
-                WaylandCompositor.nativeSendSceneInput(3, button, if (event.actionMasked == MotionEvent.ACTION_BUTTON_PRESS) 1 else 0)
+                WaylandCompositor.sendSceneInput(3, button, if (event.actionMasked == MotionEvent.ACTION_BUTTON_PRESS) 1 else 0)
             }
             MotionEvent.ACTION_SCROLL -> {
                 val v = event.getAxisValue(MotionEvent.AXIS_VSCROLL)
-                if (v != 0f) WaylandCompositor.nativeSendSceneInput(4, -Math.round(v), 0)
+                if (v != 0f) WaylandCompositor.sendSceneInput(4, -Math.round(v), 0)
             }
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP -> {}
             else -> return false
@@ -2747,11 +2747,11 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
                     MotionEvent.BUTTON_TERTIARY -> PointerGestures.BTN_MIDDLE
                     else -> PointerGestures.BTN_LEFT
                 }
-                WaylandCompositor.nativeSendSceneInput(3, button, if (event.actionMasked == MotionEvent.ACTION_BUTTON_PRESS) 1 else 0)
+                WaylandCompositor.sendSceneInput(3, button, if (event.actionMasked == MotionEvent.ACTION_BUTTON_PRESS) 1 else 0)
             }
             MotionEvent.ACTION_SCROLL -> {
                 val v = event.getAxisValue(MotionEvent.AXIS_VSCROLL)
-                if (v != 0f) WaylandCompositor.nativeSendSceneInput(4, -Math.round(v), 0)
+                if (v != 0f) WaylandCompositor.sendSceneInput(4, -Math.round(v), 0)
             }
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP -> {}
             else -> return false
@@ -2956,7 +2956,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
             if (CompositorHost.isStarted) {
                 WaylandCompositor.nativeSendTouch(3, -1, 0, 0)
                 listOf(PointerGestures.BTN_LEFT, PointerGestures.BTN_RIGHT, PointerGestures.BTN_MIDDLE).forEach {
-                    WaylandCompositor.nativeSendSceneInput(3, it, 0)
+                    WaylandCompositor.sendSceneInput(3, it, 0)
                 }
                 WaylandCompositor.nativeSetScaleMode(SCALE_FIT, ALIGN_CENTER)
             }

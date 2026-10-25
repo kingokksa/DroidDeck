@@ -1138,6 +1138,7 @@ struct DeckHidraw {
   FakeInputRingHeader *ring = nullptr;
   size_t mapping_size = 0;
   uint8_t pending_feature = 0;
+  bool mouse = false;
   bool touch = false;
   bool triton = false;
   bool emulated = false;
@@ -2280,6 +2281,201 @@ __attribute__((constructor)) static void start_touch_controller() {
   if (pthread_create(&thread, nullptr, touch_plug_thread, nullptr) == 0) pthread_detach(thread);
 }
 
+static constexpr const char *MOUSE_HIDRAW_PATH = "/dev/hidraw22";
+static constexpr unsigned int MOUSE_HIDRAW_MINOR = 22;
+static constexpr int MOUSE_REPORT_BYTES = 4;
+static constexpr int MOUSE_POLL_INTERVAL_US = 1000;
+static constexpr const char *MOUSE_NAME = "DroidDeck Virtual Mouse";
+static constexpr const char *MOUSE_SERIAL = "DROIDDECKM001";
+static constexpr const char *MOUSE_DEVPATH = "/devices/droiddeck/usb6/6-1:1.0/0003:0DDE:0001.0007/hidraw/hidraw22";
+static const uint8_t kMouseReportDescriptor[] = {
+    0x05, 0x01, 0x09, 0x02, 0xa1, 0x01, 0x09, 0x01, 0xa1, 0x00,
+    0x05, 0x09, 0x19, 0x01, 0x29, 0x03, 0x15, 0x00, 0x25, 0x01,
+    0x95, 0x03, 0x75, 0x01, 0x81, 0x02, 0x95, 0x01, 0x75, 0x05, 0x81, 0x03,
+    0x05, 0x01, 0x09, 0x30, 0x09, 0x31, 0x09, 0x38, 0x15, 0x81, 0x25, 0x7f,
+    0x75, 0x08, 0x95, 0x03, 0x81, 0x06, 0xc0, 0xc0};
+
+struct MouseRingFile {
+  uint32_t magic;
+  uint32_t version;
+  uint64_t report_seq;
+  uint8_t report[MOUSE_REPORT_BYTES];
+  uint32_t plugged;
+  uint32_t opened;
+};
+static constexpr uint32_t MOUSE_RING_MAGIC = 0x3145534d;
+static constexpr size_t MOUSE_RING_SIZE = 256;
+static_assert(offsetof(MouseRingFile, report) == 16, "MouseRingFile layout");
+static_assert(offsetof(MouseRingFile, plugged) == 20, "MouseRingFile layout");
+static_assert(offsetof(MouseRingFile, opened) == 24, "MouseRingFile layout");
+
+__attribute__((visibility("hidden"))) static MouseRingFile *mouse_ring() {
+  static MouseRingFile *ring = nullptr;
+  static std::once_flag once;
+  std::call_once(once, [] {
+    const char *path = getenv("FAKE_EVDEV_MOUSE_RING");
+    if (!path || !*path) return;
+    static auto my_open = reinterpret_cast<int (*)(const char *, int, ...)>(dlsym(RTLD_NEXT, "open"));
+    int fd = my_open(path, O_RDWR | O_CLOEXEC);
+    if (fd < 0) {
+      Logger::log("mouse: %s not openable (%s)\n", path, strerror(errno));
+      return;
+    }
+    void *mapping = mmap(nullptr, MOUSE_RING_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    syscall(SYS_close, fd);
+    if (mapping == MAP_FAILED || static_cast<MouseRingFile *>(mapping)->magic != MOUSE_RING_MAGIC) {
+      Logger::log("mouse: %s %s\n", path, mapping == MAP_FAILED ? "could not be mapped" : "has no valid header");
+      if (mapping != MAP_FAILED) munmap(mapping, MOUSE_RING_SIZE);
+      return;
+    }
+    ring = static_cast<MouseRingFile *>(mapping);
+  });
+  return ring;
+}
+
+__attribute__((visibility("hidden"))) static bool mouse_plugged() {
+  MouseRingFile *ring = mouse_ring();
+  return ring && __atomic_load_n(&ring->plugged, __ATOMIC_ACQUIRE) != 0;
+}
+
+__attribute__((visibility("hidden"))) static bool is_mouse_hidraw_path(const char *pathname) {
+  return pathname && !strcmp(pathname, MOUSE_HIDRAW_PATH) && mouse_plugged();
+}
+
+__attribute__((visibility("hidden"))) static void mouse_state(void (*write)(MouseRingFile &)) {
+  MouseRingFile *ring = mouse_ring();
+  if (!ring) return;
+  static std::mutex mutex;
+  std::lock_guard<std::mutex> guard(mutex);
+  write(*ring);
+}
+
+__attribute__((visibility("hidden"))) static void *mouse_report_thread(void *arg) {
+  auto *holder = static_cast<std::shared_ptr<DeckHidraw> *>(arg);
+  std::shared_ptr<DeckHidraw> self = *holder;
+  delete holder;
+  MouseRingFile *ring = mouse_ring();
+  uint64_t seen = __atomic_load_n(&ring->report_seq, __ATOMIC_ACQUIRE);
+  uint8_t report[MOUSE_REPORT_BYTES];
+  while (mouse_plugged()) {
+    uint64_t seq = __atomic_load_n(&ring->report_seq, __ATOMIC_ACQUIRE);
+    if (seq != seen && !(seq & 1)) {
+      memcpy(report, ring->report, sizeof(report));
+      seen = seq;
+      if (send(self->peer, report, sizeof(report), MSG_DONTWAIT | MSG_NOSIGNAL) < 0 &&
+          errno != EAGAIN && errno != EWOULDBLOCK)
+        break;
+    }
+    sleep_us(MOUSE_POLL_INTERVAL_US);
+  }
+  syscall(SYS_close, self->peer);
+  mouse_state([](MouseRingFile &r) { if (r.opened) r.opened--; });
+  return nullptr;
+}
+
+__attribute__((visibility("hidden"))) static int open_mouse_hidraw(int flags) {
+  if (!mouse_plugged()) {
+    errno = ENOENT;
+    return -1;
+  }
+  int pair[2];
+  if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, pair) < 0) return -1;
+  int buffer = MOUSE_REPORT_BYTES * 16;
+  setsockopt(pair[1], SOL_SOCKET, SO_SNDBUF, &buffer, sizeof(buffer));
+  if (!(flags & O_CLOEXEC)) fcntl(pair[0], F_SETFD, 0);
+  if (flags & O_NONBLOCK) fcntl(pair[0], F_SETFL, fcntl(pair[0], F_GETFL) | O_NONBLOCK);
+  auto mouse = std::make_shared<DeckHidraw>();
+  mouse->peer = pair[1];
+  mouse->mouse = true;
+  {
+    std::lock_guard<std::recursive_mutex> guard(controller_mutex());
+    deck_map()[pair[0]] = mouse;
+    watch_fd(pair[0]);
+  }
+  mouse_state([](MouseRingFile &r) { r.opened++; });
+  pthread_t thread;
+  auto *arg = new std::shared_ptr<DeckHidraw>(mouse);
+  if (pthread_create(&thread, nullptr, mouse_report_thread, arg) != 0) {
+    delete arg;
+    std::lock_guard<std::recursive_mutex> guard(controller_mutex());
+    deck_map().erase(pair[0]);
+    unwatch_fd(pair[0]);
+    syscall(SYS_close, pair[0]);
+    syscall(SYS_close, pair[1]);
+    mouse_state([](MouseRingFile &r) { if (r.opened) r.opened--; });
+    errno = ENOMEM;
+    return -1;
+  }
+  pthread_detach(thread);
+  Logger::log("mouse: %s opened as fd %d\n", MOUSE_HIDRAW_PATH, pair[0]);
+  return pair[0];
+}
+
+__attribute__((visibility("hidden"))) static int ioctl_mouse(DeckHidraw &mouse, ioctl_request_t op, void *argp) {
+  if (_IOC_TYPE(op) != 'H') {
+    errno = ENOTTY;
+    return -1;
+  }
+  size_t size = _IOC_SIZE(op);
+  switch (_IOC_NR(op)) {
+  case 0x01:
+    *static_cast<int *>(argp) = sizeof(kMouseReportDescriptor);
+    return 0;
+  case 0x02: {
+    auto *descriptor = static_cast<uint8_t *>(argp);
+    uint32_t want;
+    memcpy(&want, descriptor, sizeof(want));
+    memcpy(descriptor + 4, kMouseReportDescriptor, std::min<size_t>(want, sizeof(kMouseReportDescriptor)));
+    return 0;
+  }
+  case 0x03: {
+    struct {
+      uint32_t bustype;
+      int16_t vendor;
+      int16_t product;
+    } info = {BUS_USB, static_cast<int16_t>(0x0dde), 0x0001};
+    memcpy(argp, &info, sizeof(info));
+    return 0;
+  }
+  case 0x04: return copy_ioctl_string(op, argp, MOUSE_NAME);
+  case 0x05: return copy_ioctl_string(op, argp, "usb-droiddeck-6/input0");
+  case 0x08: return copy_ioctl_string(op, argp, MOUSE_SERIAL);
+  case 0x06:
+    mouse.pending_feature = size > 0 ? static_cast<uint8_t *>(argp)[0] : 0;
+    return static_cast<int>(size);
+  default:
+    errno = EINVAL;
+    return -1;
+  }
+}
+
+__attribute__((visibility("hidden"))) static void mouse_uevent(const char *action) {
+  int sent = inject_uevent(action, MOUSE_DEVPATH, "hidraw", MOUSE_HIDRAW_PATH, DECK_HIDRAW_MAJOR, MOUSE_HIDRAW_MINOR);
+  Logger::log("mouse: %s (udev event to %d monitor%s)\n", action, sent, sent == 1 ? "" : "s");
+}
+
+__attribute__((visibility("hidden"))) static void *mouse_plug_thread(void *) {
+  bool was = mouse_plugged();
+  Logger::log("mouse: %s at start\n", was ? "plugged in" : "unplugged");
+  if (was) mouse_uevent("add");
+  for (;;) {
+    struct timespec interval = {0, 50 * 1000 * 1000};
+    nanosleep(&interval, nullptr);
+    bool now = mouse_plugged();
+    if (now == was) continue;
+    was = now;
+    mouse_uevent(now ? "add" : "remove");
+  }
+  return nullptr;
+}
+
+__attribute__((constructor)) static void start_virtual_mouse() {
+  config();
+  if (!process_is_steam_client() || !mouse_ring()) return;
+  pthread_t thread;
+  if (pthread_create(&thread, nullptr, mouse_plug_thread, nullptr) == 0) pthread_detach(thread);
+}
+
 static constexpr long SYSFS_FS_MAGIC = 0x62656572;
 
 __attribute__((visibility("hidden"))) static const char *deck_listing_dir() {
@@ -2960,6 +3156,7 @@ EXPORT int open(const char *pathname, int flags, ...) {
   if (is_triton_pad_path(pathname)) return open_triton_hidraw(flags, true);
   if (int sony = sony_pad_path(pathname)) return open_deck_hidraw(flags, static_cast<uint8_t>(sony));
   if (is_touch_hidraw_path(pathname)) return open_touch_hidraw(flags);
+  if (is_mouse_hidraw_path(pathname)) return open_mouse_hidraw(flags);
   if (is_withdrawn_pad_path(pathname)) {
     errno = ENOENT;
     return -1;
@@ -3038,6 +3235,7 @@ EXPORT int openat(int dirfd, const char *pathname, int flags, ...) {
   if (is_triton_pad_path(pathname)) return open_triton_hidraw(flags, true);
   if (int sony = sony_pad_path(pathname)) return open_deck_hidraw(flags, static_cast<uint8_t>(sony));
   if (is_touch_hidraw_path(pathname)) return open_touch_hidraw(flags);
+  if (is_mouse_hidraw_path(pathname)) return open_mouse_hidraw(flags);
   if (is_withdrawn_pad_path(pathname)) {
     errno = ENOENT;
     return -1;
@@ -3106,6 +3304,12 @@ static int fake_stat_path(const char *pathname, S *statbuf, Real real) {
     statbuf->st_rdev = makedev(DECK_HIDRAW_MAJOR, TOUCH_HIDRAW_MINOR);
     return 0;
   }
+  if (is_mouse_hidraw_path(pathname)) {
+    memset(statbuf, 0, sizeof(*statbuf));
+    statbuf->st_mode = S_IFCHR | 0666;
+    statbuf->st_rdev = makedev(DECK_HIDRAW_MAJOR, MOUSE_HIDRAW_MINOR);
+    return 0;
+  }
   if (is_deck_hidraw_path(pathname)) {
     memset(statbuf, 0, sizeof(*statbuf));
     statbuf->st_mode = S_IFCHR | 0666;
@@ -3171,7 +3375,8 @@ static int fake_stat_fd(int fd, S *buf, Real real) {
   if (ret == 0 && deck_map().count(fd)) {
     buf->st_mode = (buf->st_mode & ~S_IFMT) | S_IFCHR;
     const auto &device = *deck_map()[fd];
-    unsigned int minor = device.touch ? TOUCH_HIDRAW_MINOR
+    unsigned int minor = device.mouse ? MOUSE_HIDRAW_MINOR
+                       : device.touch ? TOUCH_HIDRAW_MINOR
                        : device.sony == 4 ? DS4_HIDRAW_MINOR
                        : device.sony == 5 ? DUALSENSE_HIDRAW_MINOR
                        : device.emulated ? TRITON_PAD_HIDRAW_MINOR
@@ -3226,6 +3431,7 @@ EXPORT int access(const char *pathname, int mode) {
       process_is_steam_client())
     return 0;
   if (is_touch_hidraw_path(pathname)) return 0;
+  if (is_mouse_hidraw_path(pathname)) return 0;
   if (is_withdrawn_pad_path(pathname) || is_deck_hidraw_path(pathname) || is_triton_hidraw_path(pathname) ||
       is_triton_pad_path(pathname) || sony_pad_path(pathname)) {
     errno = ENOENT;
@@ -3267,6 +3473,7 @@ EXPORT int faccessat(int dirfd, const char *pathname, int mode, int flags) {
       process_is_steam_client())
     return 0;
   if (is_touch_hidraw_path(pathname)) return 0;
+  if (is_mouse_hidraw_path(pathname)) return 0;
   if (is_withdrawn_pad_path(pathname) || is_deck_hidraw_path(pathname) || is_triton_hidraw_path(pathname) ||
       is_triton_pad_path(pathname) || sony_pad_path(pathname)) {
     errno = ENOENT;
@@ -3396,6 +3603,7 @@ EXPORT int ioctl(int fd, ioctl_request_t op, ...) {
   if (maker != uinput_map().end()) return ioctl_uinput(*maker->second, op, argp);
   auto deck = deck_map().find(fd);
   if (deck != deck_map().end()) {
+    if (deck->second->mouse) return ioctl_mouse(*deck->second, op, argp);
     if (deck->second->touch) return ioctl_touch(*deck->second, op, argp);
     if (deck->second->sony) return ioctl_sony(*deck->second, op, argp);
     if (deck->second->triton) {

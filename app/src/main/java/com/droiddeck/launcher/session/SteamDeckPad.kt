@@ -42,6 +42,22 @@ object SteamDeckPad {
     ).map { it.toByte() }.toByteArray()
     private const val TRITON_PAD_MINOR = 19
 
+    private const val MOUSE_MINOR = 22
+    private const val MOUSE_NODE = "hidraw$MOUSE_MINOR"
+    private const val MOUSE_USB = "$GUEST_DEVICES/usb6"
+    private const val MOUSE_INTERFACE = "$MOUSE_USB/6-1:1.0"
+    private const val MOUSE_HID = "$MOUSE_INTERFACE/0003:0DDE:0001.0007"
+    private const val MOUSE_HIDRAW = "$MOUSE_HID/hidraw/$MOUSE_NODE"
+    private const val MOUSE_SERIAL = "DROIDDECKM001"
+
+    private val MOUSE_REPORT_DESCRIPTOR = intArrayOf(
+        0x05, 0x01, 0x09, 0x02, 0xa1, 0x01, 0x09, 0x01, 0xa1, 0x00,
+        0x05, 0x09, 0x19, 0x01, 0x29, 0x03, 0x15, 0x00, 0x25, 0x01,
+        0x95, 0x03, 0x75, 0x01, 0x81, 0x02, 0x95, 0x01, 0x75, 0x05, 0x81, 0x03,
+        0x05, 0x01, 0x09, 0x30, 0x09, 0x31, 0x09, 0x38, 0x15, 0x81, 0x25, 0x7f,
+        0x75, 0x08, 0x95, 0x03, 0x81, 0x06, 0xc0, 0xc0,
+    ).map { it.toByte() }.toByteArray()
+
     private const val TOUCH_MINOR = 17
     private const val TOUCH_NODE = "hidraw$TOUCH_MINOR"
     private const val TOUCH_USB = "$GUEST_DEVICES/usb2"
@@ -110,7 +126,7 @@ object SteamDeckPad {
     }
 
     fun prepare(context: Context, sessionRoot: File, touch: Boolean = false, triton: Boolean = false,
-                padType: Int = com.droiddeck.launcher.input.FakeInputWriter.PAD_TYPE_DECK): List<String> {
+                padType: Int = com.droiddeck.launcher.input.FakeInputWriter.PAD_TYPE_DECK, mouse: Boolean = false): List<String> {
         val base = File(sessionRoot, "sys/deck")
         val devices = File(base, "devices")
         val hidrawClass = File(base, "class-hidraw")
@@ -263,6 +279,33 @@ object SteamDeckPad {
             describeSony(dualSense = true)
             describeTriton(wired = true)
             if (triton) describeTriton(wired = false)
+            if (mouse) {
+                write(MOUSE_USB, "uevent", "DEVTYPE=usb_device\nPRODUCT=dde/1/100\nTYPE=0/0/0\nBUSNUM=006\nDEVNUM=002\n")
+                write(MOUSE_USB, "idVendor", "0dde\n")
+                write(MOUSE_USB, "idProduct", "0001\n")
+                write(MOUSE_USB, "bcdDevice", "0100\n")
+                write(MOUSE_USB, "manufacturer", "DroidDeck\n")
+                write(MOUSE_USB, "product", "DroidDeck Virtual Mouse\n")
+                write(MOUSE_USB, "serial", "$MOUSE_SERIAL\n")
+                link(File(dir(MOUSE_USB), "subsystem"), "/sys/bus/usb")
+                write(MOUSE_INTERFACE, "uevent", "DEVTYPE=usb_interface\nPRODUCT=dde/1/100\nINTERFACE=3/1/2\n")
+                write(MOUSE_INTERFACE, "bInterfaceNumber", "00\n")
+                write(MOUSE_INTERFACE, "bInterfaceClass", "03\n")
+                link(File(dir(MOUSE_INTERFACE), "subsystem"), "/sys/bus/usb")
+                write(MOUSE_HID, "uevent", "DRIVER=hid-generic\nHID_ID=0003:00000DDE:00000001\n" +
+                    "HID_NAME=DroidDeck Virtual Mouse\nHID_PHYS=usb-droiddeck-6/input0\n" +
+                    "HID_UNIQ=$MOUSE_SERIAL\nMODALIAS=hid:b0003g0001v00000DDEp00000001\n")
+                File(dir(MOUSE_HID), "report_descriptor").writeBytes(MOUSE_REPORT_DESCRIPTOR)
+                link(File(dir(MOUSE_HID), "subsystem"), "/sys/bus/hid")
+                write(MOUSE_HIDRAW, "uevent", "MAJOR=$MAJOR\nMINOR=$MOUSE_MINOR\nDEVNAME=$MOUSE_NODE\n")
+                write(MOUSE_HIDRAW, "dev", "$MAJOR:$MOUSE_MINOR\n")
+                link(File(dir(MOUSE_HIDRAW), "subsystem"), "/sys/class/hidraw")
+                link(File(dir(MOUSE_HIDRAW), "device"), MOUSE_HID)
+                link(File(hidrawClass, MOUSE_NODE), MOUSE_HIDRAW)
+                link(File(LinuxRuntime.liveDir(context), "drm/sys/$MAJOR:$MOUSE_MINOR"), MOUSE_HIDRAW)
+                File(udevData, "c$MAJOR:$MOUSE_MINOR").writeText("I:1\nE:ID_INPUT=1\nE:ID_INPUT_MOUSE=1\n")
+                Log.i(TAG, "virtual mouse: /dev/$MOUSE_NODE described as a USB mouse (0dde:0001)")
+            }
             hidrawClassDir = hidrawClass
             showPad(padType)
 

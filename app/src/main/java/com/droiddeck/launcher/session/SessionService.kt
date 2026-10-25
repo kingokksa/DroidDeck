@@ -799,7 +799,7 @@ class SessionService : Service() {
         val wantsTouch = wantsDeck && !File(Environment.getExternalStorageDirectory(), NO_STEAM_TOUCH_SWITCH).exists()
         val wantsTriton = wantsDeck && SteamControllerBle.hasPairedController(this)
         deckBinds = if (wantsDeck) SteamDeckPad.prepare(this, fakeInputDir.parentFile!!.parentFile!!, wantsTouch, wantsTriton,
-            SessionPrefs.padType(SessionPrefs.steamController(this))) else emptyList()
+            SessionPrefs.padType(SessionPrefs.steamController(this)), wantsDeck) else emptyList()
         SessionState.deckPad = deckBinds.isNotEmpty()
         if (wantsDeck && !SessionState.deckPad) Log.w(TAG, "deck pad: not available this session; the pad stays an Xbox 360 controller")
         logControllersAtStart()
@@ -815,6 +815,9 @@ class SessionService : Service() {
                 InputSysfsComponent.padTypeChanged(SessionPrefs.padType(padType))
                 if (wantsTouch) com.droiddeck.launcher.input.SteamTouchDevice.prepare(fakeInputDir)?.let {
                     guest.add("FAKE_TOUCHCTL_RING=" + it.path)
+                }
+                com.droiddeck.launcher.input.VirtualMouse.prepare(fakeInputDir)?.let {
+                    guest.add("FAKE_EVDEV_MOUSE_RING=" + it.path)
                 }
                 guest.add("FAKE_DECK_SYSFS_LISTING=" + SteamDeckPad.listingDir(fakeInputDir.parentFile!!.parentFile!!).path)
             }
@@ -1693,6 +1696,7 @@ class SessionService : Service() {
         components.clear()
         FakeInputWriter.releaseAllRingSlots()
         com.droiddeck.launcher.input.SteamTouchDevice.release()
+        com.droiddeck.launcher.input.VirtualMouse.release()
         val steamClientMayRun = SessionState.mode == MODE_STEAM || SessionState.mode == MODE_DESKTOP
         val finishAfterTeardown: () -> Unit = {
             if (prootPid > 1 || auxiliary.isNotEmpty()) {
