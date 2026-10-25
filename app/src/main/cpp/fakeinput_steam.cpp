@@ -2354,15 +2354,23 @@ template <typename F> __attribute__((visibility("hidden"))) static void mouse_st
   write(*ring);
 }
 
+__attribute__((visibility("hidden"))) static const char *self_comm() {
+  static char comm[16] = {};
+  static std::once_flag once;
+  std::call_once(once, [] {
+    int fd = static_cast<int>(syscall(SYS_openat, AT_FDCWD, "/proc/self/comm", O_RDONLY | O_CLOEXEC));
+    if (fd < 0) return;
+    ssize_t n = syscall(SYS_read, fd, comm, sizeof(comm) - 1);
+    syscall(SYS_close, fd);
+    for (ssize_t i = 0; i < n; ++i)
+      if (comm[i] == '\n') comm[i] = 0;
+  });
+  return comm;
+}
+
 __attribute__((visibility("hidden"))) static void note_mouse_opener() {
-  int fd = static_cast<int>(syscall(SYS_openat, AT_FDCWD, "/proc/self/comm", O_RDONLY | O_CLOEXEC));
-  if (fd < 0) return;
   char comm[16] = {};
-  ssize_t n = syscall(SYS_read, fd, comm, sizeof(comm) - 1);
-  syscall(SYS_close, fd);
-  if (n <= 0) return;
-  for (ssize_t i = 0; i < n; ++i)
-    if (comm[i] == '\n') comm[i] = 0;
+  memcpy(comm, self_comm(), sizeof(comm));
   mouse_state([&](MouseRingFile &r) { memcpy(r.opener, comm, sizeof(r.opener)); });
 }
 
@@ -2392,9 +2400,11 @@ __attribute__((visibility("hidden"))) static void *mouse_report_thread(void *arg
 
 __attribute__((visibility("hidden"))) static int open_mouse_hidraw(int flags) {
   if (!mouse_plugged()) {
+    Logger::log("mouse: %s asked for %s while unplugged\n", self_comm(), MOUSE_HIDRAW_PATH);
     errno = ENOENT;
     return -1;
   }
+  Logger::log("mouse: %s opens %s (flags 0x%x)\n", self_comm(), MOUSE_HIDRAW_PATH, flags);
   int pair[2];
   if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, pair) < 0) return -1;
   int buffer = MOUSE_REPORT_BYTES * 16;
@@ -2431,10 +2441,12 @@ __attribute__((visibility("hidden"))) static int open_mouse_hidraw(int flags) {
 
 __attribute__((visibility("hidden"))) static int ioctl_mouse(DeckHidraw &mouse, ioctl_request_t op, void *argp) {
   if (_IOC_TYPE(op) != 'H') {
+    Logger::log("mouse: %s ioctl type 0x%x is not HID\n", self_comm(), static_cast<unsigned>(_IOC_TYPE(op)));
     errno = ENOTTY;
     return -1;
   }
   size_t size = _IOC_SIZE(op);
+  Logger::log("mouse: %s ioctl 0x%x (size %zu)\n", self_comm(), static_cast<unsigned>(_IOC_NR(op)), size);
   switch (_IOC_NR(op)) {
   case 0x01:
     *static_cast<int *>(argp) = sizeof(kMouseReportDescriptor);
@@ -2462,6 +2474,7 @@ __attribute__((visibility("hidden"))) static int ioctl_mouse(DeckHidraw &mouse, 
     mouse.pending_feature = size > 0 ? static_cast<uint8_t *>(argp)[0] : 0;
     return static_cast<int>(size);
   default:
+    Logger::log("mouse: %s ioctl 0x%x is not handled\n", self_comm(), static_cast<unsigned>(_IOC_NR(op)));
     errno = EINVAL;
     return -1;
   }
@@ -2492,6 +2505,14 @@ __attribute__((constructor)) static void start_virtual_mouse() {
   if (!process_is_steam_client() || !mouse_ring()) return;
   pthread_t thread;
   if (pthread_create(&thread, nullptr, mouse_plug_thread, nullptr) == 0) pthread_detach(thread);
+}
+
+__attribute__((constructor)) static void note_mouse_preload() {
+  const char *path = getenv("FAKE_EVDEV_MOUSE_RING");
+  if (!path || !*path) return;
+  MouseRingFile *ring = mouse_ring();
+  Logger::log("mouse: %s loaded the preload, ring %s, plugged %d\n", self_comm(), ring ? "mapped" : "missing",
+              ring ? static_cast<int>(__atomic_load_n(&ring->plugged, __ATOMIC_ACQUIRE)) : -1);
 }
 
 static constexpr long SYSFS_FS_MAGIC = 0x62656572;
@@ -3323,6 +3344,7 @@ static int fake_stat_path(const char *pathname, S *statbuf, Real real) {
     return 0;
   }
   if (is_mouse_hidraw_path(pathname)) {
+    Logger::log("mouse: %s stats %s\n", self_comm(), pathname);
     memset(statbuf, 0, sizeof(*statbuf));
     statbuf->st_mode = S_IFCHR | 0666;
     statbuf->st_rdev = makedev(DECK_HIDRAW_MAJOR, MOUSE_HIDRAW_MINOR);
