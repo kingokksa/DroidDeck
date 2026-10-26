@@ -265,7 +265,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
                 cursorVisible = false
                 return
             }
-            cursorResyncIdle = if (alignCursorToGuest()) 0 else cursorResyncIdle + 1
+            cursorResyncIdle = if (touchDrivesPointer()) 0 else if (alignCursorToGuest()) 0 else cursorResyncIdle + 1
             if (!cursorVisible || pointerLocked) return
             if (cursorResyncIdle > CURSOR_RESYNC_IDLE_TICKS) return
             uiHandler.postDelayed(this, 60)
@@ -2603,9 +2603,11 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         if (SessionState.mode == SessionService.MODE_STEAM && SessionState.steamUi != "desktop") uiHandler.postDelayed(cursorHide, 2500)
     }
 
-    private fun directTouchCursorHidden(): Boolean =
-        !directCursorOn && (routedTouchMode == SessionPrefs.TOUCH_DIRECT ||
-            (routedTouchMode == SessionPrefs.TOUCH_AUTO && !usingTouchpad()))
+    private fun touchDrivesPointer(): Boolean =
+        routedTouchMode == SessionPrefs.TOUCH_DIRECT ||
+            (routedTouchMode == SessionPrefs.TOUCH_AUTO && !usingTouchpad())
+
+    private fun directTouchCursorHidden(): Boolean = !directCursorOn && touchDrivesPointer()
 
     private fun syncClientCursor(): Boolean {
         if (!CompositorHost.isStarted) return false
