@@ -3125,4 +3125,5 @@
     <string name="itch_collections">Raccolte</string>
     <string name="xbox_filter_cloud">Cloud</string>
     <string name="stores_xbox_cloud_settings">Impostazioni cloud</string>
+    <string name="exit_hint_back">Premi di nuovo indietro per uscire</string>
 </resources>

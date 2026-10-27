@@ -3162,4 +3162,5 @@
     <string name="itch_collections">Kolekcje</string>
     <string name="xbox_filter_cloud">Chmura</string>
     <string name="stores_xbox_cloud_settings">Ustawienia chmury</string>
+    <string name="exit_hint_back">Naciśnij wstecz jeszcze raz, aby wyjść</string>
 </resources>

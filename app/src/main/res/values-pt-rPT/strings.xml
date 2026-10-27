@@ -3125,4 +3125,5 @@
     <string name="itch_collections">Coleções</string>
     <string name="xbox_filter_cloud">Nuvem</string>
     <string name="stores_xbox_cloud_settings">Definições da nuvem</string>
+    <string name="exit_hint_back">Prima novamente o botão Voltar para sair</string>
 </resources>
