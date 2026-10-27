@@ -2,7 +2,6 @@
 <resources>
     <string name="mode_touch_gestures">Cử chỉ</string>
     <string name="gesture_settings">Cài đặt cử chỉ cảm ứng</string>
-    <string name="gesture_settings_hint">Tùy chỉnh cử chỉ chuột và bàn phím. Chọn Cử chỉ làm chế độ cảm ứng để sử dụng.</string>
     <string name="gesture_tap">Chạm</string>
     <string name="gesture_drag">Kéo bằng một ngón tay</string>
     <string name="gesture_long_press">Nhấn giữ</string>

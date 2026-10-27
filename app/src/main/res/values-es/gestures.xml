@@ -2,7 +2,6 @@
 <resources>
     <string name="mode_touch_gestures">Gestos</string>
     <string name="gesture_settings">Ajustes de gestos táctiles</string>
-    <string name="gesture_settings_hint">Personaliza los gestos de ratón y teclado. Selecciona Gestos como modo táctil para usarlos.</string>
     <string name="gesture_tap">Toque</string>
     <string name="gesture_drag">Arrastre con un dedo</string>
     <string name="gesture_long_press">Pulsación prolongada</string>

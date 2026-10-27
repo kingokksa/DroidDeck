@@ -2,7 +2,6 @@
 <resources>
     <string name="mode_touch_gestures">Gesturi</string>
     <string name="gesture_settings">Setări pentru gesturile tactile</string>
-    <string name="gesture_settings_hint">Personalizează gesturile de mouse și tastatură. Selectează Gesturi ca mod tactil pentru a le folosi.</string>
     <string name="gesture_tap">Atingere</string>
     <string name="gesture_drag">Tragere cu un deget</string>
     <string name="gesture_long_press">Apăsare lungă</string>

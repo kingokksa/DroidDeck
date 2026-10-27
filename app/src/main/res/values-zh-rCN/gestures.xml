@@ -2,7 +2,6 @@
 <resources>
     <string name="mode_touch_gestures">手势</string>
     <string name="gesture_settings">触屏手势设置</string>
-    <string name="gesture_settings_hint">自定义鼠标和键盘手势。请选择“手势”触控模式以使用这些功能。</string>
     <string name="gesture_tap">点按</string>
     <string name="gesture_drag">单指拖动</string>
     <string name="gesture_long_press">长按</string>

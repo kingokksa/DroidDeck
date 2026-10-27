@@ -2,7 +2,6 @@
 <resources>
     <string name="mode_touch_gestures">Gestur</string>
     <string name="gesture_settings">Setelan gestur layar sentuh</string>
-    <string name="gesture_settings_hint">Sesuaikan gestur mouse dan keyboard. Pilih Gestur sebagai mode sentuh untuk menggunakannya.</string>
     <string name="gesture_tap">Ketuk</string>
     <string name="gesture_drag">Seret dengan satu jari</string>
     <string name="gesture_long_press">Tekan lama</string>

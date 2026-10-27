@@ -2,7 +2,6 @@
 <resources>
     <string name="mode_touch_gestures">Gestures</string>
     <string name="gesture_settings">Touch gesture settings</string>
-    <string name="gesture_settings_hint">Customize mouse and keyboard gestures. Select Gestures as the touch mode to use them.</string>
     <string name="gesture_tap">Tap</string>
     <string name="gesture_drag">One-finger drag</string>
     <string name="gesture_long_press">Long press</string>

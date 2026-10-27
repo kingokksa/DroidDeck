@@ -2,7 +2,6 @@
 <resources>
     <string name="mode_touch_gestures">Gestes</string>
     <string name="gesture_settings">Paramètres des gestes tactiles</string>
-    <string name="gesture_settings_hint">Personnalisez les gestes de souris et de clavier. Sélectionnez Gestes comme mode tactile pour les utiliser.</string>
     <string name="gesture_tap">Appui</string>
     <string name="gesture_drag">Glissement à un doigt</string>
     <string name="gesture_long_press">Appui prolongé</string>

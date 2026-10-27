@@ -2,7 +2,6 @@
 <resources>
     <string name="mode_touch_gestures">Gesta</string>
     <string name="gesture_settings">Nastavení dotykových gest</string>
-    <string name="gesture_settings_hint">Přizpůsobte gesta myši a klávesnice. Chcete-li je používat, vyberte dotykový režim Gesta.</string>
     <string name="gesture_tap">Klepnutí</string>
     <string name="gesture_drag">Tažení jedním prstem</string>
     <string name="gesture_long_press">Dlouhé stisknutí</string>
