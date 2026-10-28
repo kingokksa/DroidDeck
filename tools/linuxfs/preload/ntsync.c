@@ -185,8 +185,6 @@ static pthread_once_t ns_once = PTHREAD_ONCE_INIT;
 static __thread uint32_t ns_tid;
 static __thread struct ns_tls ns_tq;
 
-static int (*ns_real_close)(int);
-
 static int ns_on(void) {
   if (ns_state < 0) {
     const char *e = getenv("BL_SYNC");
@@ -196,8 +194,7 @@ static int ns_on(void) {
 }
 
 static int ns_close_fd(int fd) {
-  if (!ns_real_close) ns_real_close = (int (*)(int))dlsym(RTLD_NEXT, "close");
-  return ns_real_close(fd);
+  return (int)syscall(SYS_close, fd);
 }
 
 static inline void ns_relax(void) {
