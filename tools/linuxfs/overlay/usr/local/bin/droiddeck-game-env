@@ -132,6 +132,18 @@ def arkham_city_x87(game):
 
 
 @fix
+def java_jit_off_c1(game):
+    """Windows x86 JVMs under FEX fault inside C1-generated code; without the C1 tier those bodies are never executed."""
+    if game.stem not in ("java", "javaw") or not game.has_arg("-jar"):
+        return None
+    existing = os.environ.get("JAVA_TOOL_OPTIONS", "")
+    if "-XX:-TieredCompilation" in existing or "-Xint" in existing:
+        return None
+    value = (existing + " " if existing else "") + "-XX:-TieredCompilation"
+    return {"JAVA_TOOL_OPTIONS": value}, [], "Java: HotSpot C1 tier off (FEX mistranslates its output)"
+
+
+@fix
 def protonfixes_off(game):
     if game.stem in ("blackops3", "darksoulsremastered"):
         return {"PROTONFIXES_DISABLE": "1"}, [], "umu-protonfixes off (its ALSA audio and VC++ installer steps fail here)"
