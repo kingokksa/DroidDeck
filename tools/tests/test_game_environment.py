@@ -1063,8 +1063,8 @@ class GameEnvironmentTest(unittest.TestCase):
                 block = script[start:script.index("\ndone\n", start) + 6].replace("/usr/local/lib/", tmp + "/")
                 for inherited, expected in (
                         (None, ["libblsession.so", "libfakeinput.so"]),
-                        (overlay, ["libblsession.so", "libfakeinput.so", overlay]),
-                        (tmp + "/libfakeinput.so:" + overlay, ["libblsession.so", "libfakeinput.so", overlay]),
+                        (overlay, [overlay, "libblsession.so", "libfakeinput.so"]),
+                        (overlay + ":" + tmp + "/libfakeinput.so", [overlay, "libfakeinput.so", "libblsession.so"]),
                         (tmp + "/libblsession.so:" + tmp + "/libfakeinput.so", ["libblsession.so", "libfakeinput.so"])):
                     env = {"PATH": os.defpath}
                     if inherited is not None:
