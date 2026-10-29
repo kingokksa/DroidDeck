@@ -372,7 +372,7 @@ for fake in /usr/local/lib/libfakeinput.so /usr/local/lib/libblsession.so; do
   if [ -f "$fake" ]; then
     case ":${LD_PRELOAD:-}:" in
       *":$fake:"*) ;;
-      *) LD_PRELOAD="$fake${LD_PRELOAD:+:$LD_PRELOAD}"; export LD_PRELOAD ;;
+      *) LD_PRELOAD="${LD_PRELOAD:+$LD_PRELOAD:}$fake"; export LD_PRELOAD ;;
     esac
   fi
 done
@@ -445,7 +445,7 @@ for fake in /usr/local/lib/libfakeinput.so /usr/local/lib/libblsession.so; do
   if [ -f "$fake" ]; then
     case ":${LD_PRELOAD:-}:" in
       *":$fake:"*) ;;
-      *) LD_PRELOAD="$fake${LD_PRELOAD:+:$LD_PRELOAD}"; export LD_PRELOAD ;;
+      *) LD_PRELOAD="${LD_PRELOAD:+$LD_PRELOAD:}$fake"; export LD_PRELOAD ;;
     esac
   fi
 done
