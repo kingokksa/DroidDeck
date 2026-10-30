@@ -41,6 +41,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import com.droiddeck.launcher.core.FileUtils
+import com.droiddeck.launcher.core.GameEnvironment
 import com.droiddeck.launcher.core.TextureFiltering
 import com.droiddeck.launcher.files.InAppFilePicker
 import com.droiddeck.launcher.frontend.Library
@@ -388,6 +389,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
     private var backDoubleTapMs by mutableStateOf(500)
     private var lowLatency by mutableStateOf(true)
     private var evdevMouseOn by mutableStateOf(false)
+    private var relativeMouseOn by mutableStateOf(false)
     private var directCursorOn by mutableStateOf(false)
     private var mouseWriter: com.droiddeck.launcher.input.FakeInputWriter? = null
     private var evdevMouseActive = false
@@ -920,7 +922,11 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
                             }
                         }
                     }
-                    if (nextGame != gestureGame) { gestureGame = nextGame; refreshGestureConfig() }
+                    if (nextGame != gestureGame) {
+                        gestureGame = nextGame
+                        refreshGestureConfig()
+                        relativeMouseOn = relativeMouseGames().contains(nextGame?.removePrefix("program:"))
+                    }
                 }
                 LaunchedEffect(drawerOpen, pcKeyboardOpen, achievementsOpen, gestureSettingsOpen, pipUi, SessionState.suspended) {
                     if (drawerOpen || pcKeyboardOpen || achievementsOpen || gestureSettingsOpen || pipUi || SessionState.suspended) {
@@ -1263,6 +1269,8 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
                 evdevMouseOn = on
                 if (on) { if (pointerLocked) openEvdevMouse() } else releaseEvdevMouse()
             },
+            relativeMouse = relativeMouseOn,
+            onRelativeMouse = { on -> setRelativeMouse(on) },
             directCursor = directCursorOn,
             onDirectCursor = { on ->
                 SessionPrefs.setDirectCursor(this@SessionActivity, on)
@@ -1543,6 +1551,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         drawerGameProfileFollowState.selectManually()
         drawerGameProfileId = appId
         drawerGameProfileRefresh = drawerGameProfileRefresh.retrying()
+        relativeMouseOn = appId?.let { relativeMouseGames().contains(it.toString()) } ?: false
         readDrawerTextureFiltering(appId)
         refreshDrawerGameProfile()
     }
@@ -1856,6 +1865,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         lowLatency = SessionPrefs.lowLatency(this)
         evdevMouseOn = SessionPrefs.evdevMouse(this)
         if (!evdevMouseOn) releaseEvdevMouse()
+        relativeMouseOn = relativeMouseGames().contains(drawerGameProfileId ?: gestureGame?.removePrefix("program:"))
         directCursorOn = SessionPrefs.directCursor(this)
         padType = SessionPrefs.steamController(this)
     }
@@ -3306,6 +3316,45 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         mouseWriter?.destroy()
         mouseWriter = null
         Log.i(TAG, "raw mouse channel removed")
+    }
+
+    private fun relativeMouseGames(): List<String> = runCatching {
+        GameEnvironment.relativeMouseGames(GameEnvironmentStore.read(this))
+    }.getOrDefault(emptyList())
+
+    private fun setRelativeMouse(on: Boolean) {
+        relativeMouseOn = on
+        val game = drawerGameProfileId ?: gestureGame?.removePrefix("program:")?.toLongOrNull()
+        if (game == null) {
+            Log.w(TAG, "relative mouse toggled with no game in focus; only the running session changes")
+            applyRelativeMouse(relativeMouseGames())
+            return
+        }
+        val config = GameEnvironmentStore.read(this)
+        val current = runCatching {
+            GameEnvironment.withScopeValue(config, game.toString(),
+                GameEnvironment.RELATIVE_MOUSE, if (on) "1" else null)
+        }.getOrNull()
+        if (current == null) {
+            Log.w(TAG, "relative mouse is stored per game; scoped out for $game")
+            return
+        }
+        GameEnvironmentStore.save(this, current)
+        applyRelativeMouse(relativeMouseGames())
+    }
+
+    private fun applyRelativeMouse(games: List<String>) {
+        val request = org.json.JSONObject()
+            .put("kind", "exec")
+            .put("argv", org.json.JSONArray(listOf("gamescopectl", "mouse_relative_force_appids", games.joinToString(","))))
+            .put("timeout", 5.0)
+        Thread({
+            val result = runCatching {
+                com.droiddeck.launcher.agent.AgentGuest.call(this, request, 8_000, trusted = true)
+            }
+            val ok = result.getOrNull()?.optBoolean("ok") == true
+            if (!ok) Log.w(TAG, "gamescope did not take the relative mouse list: ${result.exceptionOrNull() ?: result.getOrNull()}")
+        }, "relative-mouse").start()
     }
 
     private fun sendSceneDelta(dx: Float, dy: Float) {

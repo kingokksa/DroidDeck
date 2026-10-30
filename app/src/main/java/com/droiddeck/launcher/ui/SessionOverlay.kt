@@ -270,6 +270,8 @@ class DrawerActions(
     val onLowLatency: (Boolean) -> Unit = {},
     val evdevMouse: Boolean = false,
     val onEvdevMouse: (Boolean) -> Unit = {},
+    val relativeMouse: Boolean = false,
+    val onRelativeMouse: (Boolean) -> Unit = {},
     val directCursor: Boolean = false,
     val onDirectCursor: (Boolean) -> Unit = {},
     val onTouch: (String) -> Unit,
@@ -662,6 +664,9 @@ internal fun SessionDrawer(open: Boolean, requestedPage: SessionDrawerPage, cont
                                 ToggleRow(host, "evdev-mouse", stringResource(R.string.drawer_evdev_mouse),
                                     null, a.evdevMouse,
                                     chipModifier = focus.track(page, "evdev-mouse"), onChange = a.onEvdevMouse)
+                                if (a.selectedGameProfileId != null) ToggleRow(host, "relative-mouse",
+                                    stringResource(R.string.drawer_relative_mouse), null, a.relativeMouse,
+                                    chipModifier = focus.track(page, "relative-mouse"), onChange = a.onRelativeMouse)
                             }
                             SettingsGroup(stringResource(R.string.drawer_keyboard)) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().padding(8.dp)) {
