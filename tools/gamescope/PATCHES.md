@@ -209,3 +209,13 @@ the connector's windows (`mangoapp_nudge_app_frame`). With `DROIDDECK_HUD_FRAMES
 sets `/run/droiddeck-hud/frames`), gamescope maps that file and writes the same commits of connector 0,
 whether or not a mangoapp runs, plus the focused pid, output size, refresh, Steam focus and engine name.
 The layout is in the comment above `droiddeck_hud_frames_map`; the app reads it in `hudframes.c`.
+
+## 0126 steamcompmgr: force relative mouse for chosen appids
+
+The nested backend locks the host pointer (and so gets relative motion) only while the focused game
+hides its cursor and Xwayland holds a locked pointer with a cursor hint. Games that confine the cursor
+and warp it back to the middle to read movement (`ClipCursor` + `SetCursorPos`) never get there, so
+they kept reading absolute host positions: the camera stopped at the screen edge (Pool Nation FX) or
+spun (Batman: Arkham City), issue #845. `mouse_relative_force_appids` (comma-separated, like
+`mouse_relative_filter_appids`) forces relative mode while one of those appids has input focus and is
+not Steam's own window; the app sets it from games whose profile has `DROIDDECK_RELATIVE_MOUSE=1`.
