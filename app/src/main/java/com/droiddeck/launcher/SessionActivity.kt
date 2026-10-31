@@ -265,8 +265,14 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
             if (::padMouse.isInitialized) padMouseMode()
             // Touchpad deltas are measured from the middle while locked (moveLockedPointer).
             if (locked && ::touchpad.isInitialized) {
-                drawnRect()?.let { touchpad.place(it.centerX(), it.centerY()) }
-                cursorVisible = false
+                drawnRect()?.let {
+                    touchpad.place(it.centerX(), it.centerY())
+                    if (relativeMouseOn) startLockedCursor(it)
+                }
+                if (!relativeMouseOn) cursorVisible = false
+            } else {
+                lockedCursorX = Float.NaN
+                lockedCursorY = Float.NaN
             }
             updatePointerCapture()
         }
@@ -278,6 +284,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
     private var cursorResyncIdle = 0
     private val cursorResync = object : Runnable {
         override fun run() {
+            if (pointerLocked && relativeMouseOn) return
             if (syncClientCursor() && clientHidesCursor) {
                 cursorVisible = false
                 return
@@ -395,6 +402,8 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
     private var evdevMouseActive = false
     private var lastMouseX = Float.NaN
     private var lastMouseY = Float.NaN
+    private var lockedCursorX = Float.NaN
+    private var lockedCursorY = Float.NaN
     private var padType by mutableStateOf(SessionPrefs.CONTROLLER_DECK)
     private var pcKeyboardOpen by mutableStateOf(false)
     private var achievementsInFront by mutableStateOf<AchievementsInFront?>(null)
@@ -2798,7 +2807,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
             gesturePointerX = if (pointerLocked) x else x.coerceIn(rect.left, rect.right)
             gesturePointerY = if (pointerLocked) y else y.coerceIn(rect.top, rect.bottom)
             gesturePointerReady = true
-            cursorVisible = false
+            if (!relativeMouseOn) cursorVisible = false
         }
         override fun moveBy(dx: Float, dy: Float, relative: Boolean) {
             val rect = drawnRect() ?: return
@@ -2946,7 +2955,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
         val scale = sceneScale(rect)
         sendSceneDelta((x - rect.centerX()) * scale, (y - rect.centerY()) * scale)
         touchpad.place(rect.centerX(), rect.centerY())
-        cursorVisible = false
+        if (!relativeMouseOn) cursorVisible = false
     }
 
     private fun movePointer(x: Float, y: Float) {
@@ -3324,6 +3333,13 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
 
     private fun setRelativeMouse(on: Boolean) {
         relativeMouseOn = on
+        if (!on && pointerLocked) {
+            lockedCursorX = Float.NaN
+            lockedCursorY = Float.NaN
+            cursorVisible = false
+        } else if (on && pointerLocked) {
+            drawnRect()?.let { startLockedCursor(it) }
+        }
         val game = drawerGameProfileId ?: gestureGame?.removePrefix("program:")?.toLongOrNull()
         if (game == null) {
             Log.w(TAG, "relative mouse toggled with no game in focus; only the running session changes")
@@ -3358,9 +3374,32 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
     }
 
     private fun sendSceneDelta(dx: Float, dy: Float) {
+        trackLockedCursor(dx, dy)
         val writer = if (evdevMouseActive) mouseWriter else null
         if (writer != null) writer.writeMouseDelta(dx, dy)
         else WaylandCompositor.sendPointerDelta(dx, dy)
+    }
+
+    private fun startLockedCursor(rect: android.graphics.RectF) {
+        lockedCursorX = rect.centerX()
+        lockedCursorY = rect.centerY()
+        cursorPos = androidx.compose.ui.geometry.Offset(lockedCursorX, lockedCursorY)
+        if (clientHidesCursor) cursorImage = null
+        cursorVisible = true
+    }
+
+    private fun trackLockedCursor(dxScene: Float, dyScene: Float) {
+        if (!pointerLocked || !relativeMouseOn) return
+        val rect = drawnRect() ?: return
+        if (lockedCursorX.isNaN()) {
+            startLockedCursor(rect)
+            return
+        }
+        val scale = sceneScale(rect)
+        lockedCursorX = (lockedCursorX + dxScene / scale).coerceIn(rect.left, rect.right)
+        lockedCursorY = (lockedCursorY + dyScene / scale).coerceIn(rect.top, rect.bottom)
+        cursorPos = androidx.compose.ui.geometry.Offset(lockedCursorX, lockedCursorY)
+        cursorVisible = true
     }
 
     private fun sendSceneButton(code: Int, down: Boolean) {
@@ -3376,7 +3415,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
     }
 
     private fun sendMouseDelta(x: Float, y: Float) {
-        cursorVisible = false
+        if (!pointerLocked || !relativeMouseOn) cursorVisible = false
         val previousX = lastMouseX
         val previousY = lastMouseY
         lastMouseX = x
