@@ -1,0 +1,23 @@
+--- a/src/steamcompmgr.cpp
++++ b/src/steamcompmgr.cpp
+@@ -10819,6 +10819,20 @@
+ 
+ 				const bool bRelativeMouseMode = bForcedRelativeMouse || ( bImageEmpty && bHasPointerConstraint && !bExcludedAppId );
+ 
++				{
++					static bool s_bLastMode = false;
++					static uint32_t s_uLastAppId = 0;
++					if ( bRelativeMouseMode != s_bLastMode || uAppId != s_uLastAppId )
++					{
++						console_log.infof( "DDREL: decide mode %d (cv %d forced %d imageEmpty %d constrained %d excluded %d) appid %u steam %d",
++							(int)bRelativeMouseMode, (int)cv_relative_mouse.Get(), (int)bForcedRelativeMouse,
++							(int)bImageEmpty, (int)bHasPointerConstraint, (int)bExcludedAppId,
++							uAppId, (int)window_is_steam( pPaintFocus->inputFocusWindow ) );
++						s_bLastMode = bRelativeMouseMode;
++						s_uLastAppId = uAppId;
++					}
++				}
++
+ 				pPaintFocus->GetNestedHints()->SetRelativeMouseMode( bRelativeMouseMode );
+ 			}
+ 
