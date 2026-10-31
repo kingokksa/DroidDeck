@@ -1,16 +1,17 @@
 --- a/src/Backends/WaylandBackend.cpp
 +++ b/src/Backends/WaylandBackend.cpp
-@@ -2493,7 +2493,13 @@
+@@ -2492,6 +2492,14 @@
+     }
      void CWaylandBackend::SetRelativeMouseMode( wl_surface *pSurface, bool bRelative )
      {
-         if ( !m_pPointer )
++        if ( FILE *pF = fopen( "/tmp/ddrel.log", "a" ) )
 +        {
-+            console_log.infof( "DDREL: no pointer, want %d", (int)bRelative );
-             return;
++            fprintf( pF, "want %d have %d locked %d surface %p/%p pointer %p
++",
++                (int)bRelative, (int)!!m_pLockedPointer, (int)m_bPointerLocked,
++                (void *)pSurface, (void *)m_pLockedSurface, (void *)m_pPointer );
++            fclose( pF );
 +        }
-+        console_log.infof( "DDREL: want %d have %d locked %d surface %p/%p",
-+            (int)bRelative, (int)!!m_pLockedPointer, (int)m_bPointerLocked,
-+            (void *)pSurface, (void *)m_pLockedSurface );
+         if ( !m_pPointer )
+             return;
  
-         if ( !!bRelative != !!m_pLockedPointer || ( pSurface != m_pLockedSurface && bRelative ) )
-         {
