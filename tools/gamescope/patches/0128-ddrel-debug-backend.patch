@@ -1,17 +1,65 @@
 --- a/src/Backends/WaylandBackend.cpp
 +++ b/src/Backends/WaylandBackend.cpp
-@@ -2492,6 +2492,14 @@
+@@ -14,6 +14,7 @@
+ #include "Utils/WaylandScaling.h"
+ 
+ #include <cstring>
++#include <cstdarg>
+ #include <unordered_map>
+ #include <unordered_set>
+ #include <csignal>
+@@ -2490,8 +2491,24 @@
+ 
+         UpdateCursor();
      }
++    static void ddrel_log( const char *fmt, ... )
++    {
++        FILE *pF = fopen( "/tmp/ddrel.log", "a" );
++        if ( !pF )
++            return;
++        va_list args;
++        va_start( args, fmt );
++        vfprintf( pF, fmt, args );
++        va_end( args );
++        fclose( pF );
++    }
++
      void CWaylandBackend::SetRelativeMouseMode( wl_surface *pSurface, bool bRelative )
      {
-+        if ( FILE *pF = fopen( "/tmp/ddrel.log", "a" ) )
-+        {
-+            fprintf( pF, "want %d have %d locked %d surface %p/%p pointer %p
++        ddrel_log( "set want %d have %d locked %d surface %p/%p pointer %p
 +",
-+                (int)bRelative, (int)!!m_pLockedPointer, (int)m_bPointerLocked,
-+                (void *)pSurface, (void *)m_pLockedSurface, (void *)m_pPointer );
-+            fclose( pF );
-+        }
++            (int)bRelative, (int)!!m_pLockedPointer, (int)m_bPointerLocked,
++            (void *)pSurface, (void *)m_pLockedSurface, (void *)m_pPointer );
          if ( !m_pPointer )
              return;
  
+@@ -2780,11 +2797,15 @@
+ 
+ 	void CWaylandBackend::Wayland_LockedPointer_Locked( zwp_locked_pointer_v1 *pLockedPointer )
+ 	{
++		ddrel_log( "cb locked p=%p mine=%p
++", (void *)pLockedPointer, (void *)m_pLockedPointer );
+ 		m_bPointerLocked = true;
+ 		UpdateCursor();
+ 	}
+ 	void CWaylandBackend::Wayland_LockedPointer_Unlocked( zwp_locked_pointer_v1 *pLockedPointer )
+ 	{
++		ddrel_log( "cb unlocked p=%p mine=%p have %d
++", (void *)pLockedPointer, (void *)m_pLockedPointer, (int)!!m_pLockedPointer );
+ 		m_bPointerLocked = false;
+ 		UpdateCursor();
+ 	}
+@@ -3467,7 +3488,13 @@
+     {
+ 		// Don't do any motion/movement stuff if we don't have kb focus
+ 		if ( !m_pBackend->m_bPointerLocked || ( !cv_wayland_mouse_relmotion_without_keyboard_focus && !m_bKeyboardEntered ) )
++		{
++			static int s_nDropped = 0;
++			if ( ++s_nDropped <= 20 || s_nDropped % 200 == 0 )
++				ddrel_log( "drop motion #%d locked %d kb %d
++", s_nDropped, (int)m_pBackend->m_bPointerLocked, (int)m_bKeyboardEntered );
+ 			return;
++		}
+ 
+         wlserver_lock();
+         wlserver_mousemotion( wl_fixed_to_double( fDxUnaccel ), wl_fixed_to_double( fDyUnaccel ), ++m_uFakeTimestamp );
