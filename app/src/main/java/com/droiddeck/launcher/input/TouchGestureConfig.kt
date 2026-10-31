@@ -39,6 +39,7 @@ data class TouchGestureConfig(
     val showGestureDebugOverlay: Boolean = false,
     val gestureThreshold: Int = DEFAULT_GESTURE_THRESHOLD,
     val mouseDragMovementMode: String = MOUSE_DRAG_MOVEMENT_DIRECT,
+    val relativeMouse: Boolean = false,
 ) {
 
     fun toJson(): String {
@@ -75,6 +76,7 @@ data class TouchGestureConfig(
             put(KEY_SHOW_GESTURE_DEBUG_OVERLAY, showGestureDebugOverlay)
             put(KEY_GESTURE_THRESHOLD, gestureThreshold)
             put(KEY_MOUSE_DRAG_MOVEMENT_MODE, mouseDragMovementMode)
+            put(KEY_RELATIVE_MOUSE, relativeMouse)
         }.toString()
     }
 
@@ -114,6 +116,7 @@ data class TouchGestureConfig(
         private const val KEY_LONG_PRESS_MOUSE_BEHAVIOR = "longPressMouseBehavior"
         private const val KEY_LONG_PRESS_DELAY = "longPressDelay"
         private const val KEY_DIRECT_HOLD_BEHAVIOR = "directHoldBehavior"
+        private const val KEY_RELATIVE_MOUSE = "relativeMouse"
         private const val KEY_DOUBLE_TAP_ENABLED = "doubleTapEnabled"
         private const val KEY_DOUBLE_TAP_DELAY = "doubleTapDelay"
         private const val KEY_TWO_FINGER_DRAG_ENABLED = "twoFingerDragEnabled"
@@ -191,6 +194,7 @@ data class TouchGestureConfig(
                     mouseDragMovementMode = normalizeMouseDragMovementMode(
                         obj.optString(KEY_MOUSE_DRAG_MOVEMENT_MODE, MOUSE_DRAG_MOVEMENT_DIRECT),
                     ),
+                    relativeMouse = obj.optBoolean(KEY_RELATIVE_MOUSE, false),
                 )
             } catch (_: Exception) {
                 fallbackDefaults()

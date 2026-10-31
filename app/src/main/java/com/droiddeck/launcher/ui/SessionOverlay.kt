@@ -270,6 +270,8 @@ class DrawerActions(
     val onLowLatency: (Boolean) -> Unit = {},
     val evdevMouse: Boolean = false,
     val onEvdevMouse: (Boolean) -> Unit = {},
+    val relativeMouse: Boolean = false,
+    val onRelativeMouse: (Boolean) -> Unit = {},
     val directCursor: Boolean = false,
     val onDirectCursor: (Boolean) -> Unit = {},
     val onTouch: (String) -> Unit,
@@ -585,6 +587,10 @@ internal fun SessionDrawer(open: Boolean, requestedPage: SessionDrawerPage, cont
                                 ChoiceRow(host, "touch", stringResource(R.string.mode_touch), null,
                                     listOf(SessionPrefs.TOUCH_AUTO to stringResource(R.string.drawer_touch_auto, a.touchAuto), SessionPrefs.TOUCH_PAD to stringResource(R.string.mode_touch_touchpad), SessionPrefs.TOUCH_DIRECT to stringResource(R.string.mode_touch_direct), SessionPrefs.TOUCH_GESTURES to stringResource(R.string.mode_touch_gestures), SessionPrefs.TOUCH_OFF to stringResource(R.string.widgets_off)),
                                     a.touchMode, chipModifier = focus.track(page, "touch"), onPick = a.onTouch)
+                                if (a.touchActive == SessionPrefs.TOUCH_PAD)
+                                    ToggleRow(host, "relative-mouse", stringResource(R.string.drawer_relative_mouse),
+                                        null, a.relativeMouse,
+                                        chipModifier = focus.track(page, "relative-mouse"), onChange = a.onRelativeMouse)
                                 if (a.touchActive == SessionPrefs.TOUCH_DIRECT)
                                     ToggleRow(host, "direct-cursor", stringResource(R.string.drawer_direct_cursor),
                                         null, a.directCursor,
@@ -662,6 +668,10 @@ internal fun SessionDrawer(open: Boolean, requestedPage: SessionDrawerPage, cont
                                 ToggleRow(host, "evdev-mouse", stringResource(R.string.drawer_evdev_mouse),
                                     null, a.evdevMouse,
                                     chipModifier = focus.track(page, "evdev-mouse"), onChange = a.onEvdevMouse)
+                                if (a.touchActive != SessionPrefs.TOUCH_PAD)
+                                    ToggleRow(host, "relative-mouse", stringResource(R.string.drawer_relative_mouse),
+                                        null, a.relativeMouse,
+                                        chipModifier = focus.track(page, "relative-mouse"), onChange = a.onRelativeMouse)
                             }
                             SettingsGroup(stringResource(R.string.drawer_keyboard)) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().padding(8.dp)) {

@@ -218,6 +218,7 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
     private var steamImportAsk by mutableStateOf<com.droiddeck.launcher.session.SteamImportPrompt.Ask?>(null)
     private var steamImportAnswered: String? = null
     private var directHoldBehavior by mutableStateOf(com.droiddeck.launcher.input.TouchGestureConfig.MOUSE_BEHAVIOR_CLICK)
+    private var relativeMouseOn by mutableStateOf(false)
     private var screenKeyPickerOpen by mutableStateOf(false)
     private var screenKeyBind: List<Int>? = null
     private var screenKeyDir: Int? = null
@@ -1305,6 +1306,13 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
                 val base = com.droiddeck.launcher.input.GesturePrefs.read(this@SessionActivity, gestureGame)
                 com.droiddeck.launcher.input.GesturePrefs.save(this@SessionActivity, gestureGame, base.copy(directHoldBehavior = value))
                 refreshGestureConfig()
+            },
+            relativeMouse = relativeMouseOn,
+            onRelativeMouse = { on ->
+                val base = com.droiddeck.launcher.input.GesturePrefs.read(this@SessionActivity, gestureGame)
+                com.droiddeck.launcher.input.GesturePrefs.save(this@SessionActivity, gestureGame, base.copy(relativeMouse = on))
+                relativeMouseOn = on
+                setRelativeMouse(on)
             },
             onScreenKeys = { drawerOpen = false; screenKeys?.startEditing() },
             screenKeysShown = screenKeysShown,
@@ -2773,9 +2781,22 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback {
     private fun layoutNames(): List<String> =
         com.droiddeck.launcher.input.ControllerPrefs.screenLayouts(this).keys.sorted()
 
+    private fun setRelativeMouse(on: Boolean) {
+        val request = org.json.JSONObject()
+            .put("kind", "exec")
+            .put("argv", org.json.JSONArray(listOf("gamescopectl", "relative_mouse", if (on) "1" else "0")))
+            .put("timeout", 5.0)
+        Thread({
+            val result = runCatching { AgentGuest.call(this, request, 8_000, trusted = true) }
+            val ok = result.getOrNull()?.optBoolean("ok") == true
+            if (!ok) Log.w(TAG, "gamescope did not take relative mouse: ${result.exceptionOrNull() ?: result.getOrNull()}")
+        }, "relative-mouse").start()
+    }
+
     private fun refreshGestureConfig() {
         gestureConfig = com.droiddeck.launcher.input.GesturePrefs.read(this, gestureGame)
         directHoldBehavior = gestureConfig.directHoldBehavior
+        relativeMouseOn = gestureConfig.relativeMouse
         gestureTouchStreamGate.reset()
         if (::touchscreenGestures.isInitialized) touchscreenGestures.configure(gestureConfig)
         if (::directTouchHold.isInitialized) directTouchHold.configure(gestureConfig)
