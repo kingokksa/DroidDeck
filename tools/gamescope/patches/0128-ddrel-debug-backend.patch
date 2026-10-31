@@ -8,56 +8,52 @@
  #include <unordered_map>
  #include <unordered_set>
  #include <csignal>
-@@ -2490,8 +2491,24 @@
+@@ -2490,8 +2491,23 @@
  
          UpdateCursor();
      }
 +    static void ddrel_log( const char *fmt, ... )
 +    {
-+        FILE *pF = fopen( "/tmp/ddrel.log", "a" );
-+        if ( !pF )
++        FILE *pDDREL = fopen( "/tmp/ddrel.log", "a" );
++        if ( !pDDREL )
 +            return;
 +        va_list args;
 +        va_start( args, fmt );
-+        vfprintf( pF, fmt, args );
++        vfprintf( pDDREL, fmt, args );
 +        va_end( args );
-+        fclose( pF );
++        fclose( pDDREL );
 +    }
 +
      void CWaylandBackend::SetRelativeMouseMode( wl_surface *pSurface, bool bRelative )
      {
-+        ddrel_log( "set want %d have %d locked %d surface %p/%p pointer %p
-+",
++        ddrel_log( "set want %d have %d locked %d surface %p/%p pointer %p\n",
 +            (int)bRelative, (int)!!m_pLockedPointer, (int)m_bPointerLocked,
 +            (void *)pSurface, (void *)m_pLockedSurface, (void *)m_pPointer );
          if ( !m_pPointer )
              return;
  
-@@ -2780,11 +2797,15 @@
+@@ -2780,11 +2796,13 @@
  
  	void CWaylandBackend::Wayland_LockedPointer_Locked( zwp_locked_pointer_v1 *pLockedPointer )
  	{
-+		ddrel_log( "cb locked p=%p mine=%p
-+", (void *)pLockedPointer, (void *)m_pLockedPointer );
++		ddrel_log( "cb locked p=%p mine=%p\n", (void *)pLockedPointer, (void *)m_pLockedPointer );
  		m_bPointerLocked = true;
  		UpdateCursor();
  	}
  	void CWaylandBackend::Wayland_LockedPointer_Unlocked( zwp_locked_pointer_v1 *pLockedPointer )
  	{
-+		ddrel_log( "cb unlocked p=%p mine=%p have %d
-+", (void *)pLockedPointer, (void *)m_pLockedPointer, (int)!!m_pLockedPointer );
++		ddrel_log( "cb unlocked p=%p mine=%p have %d\n", (void *)pLockedPointer, (void *)m_pLockedPointer, (int)!!m_pLockedPointer );
  		m_bPointerLocked = false;
  		UpdateCursor();
  	}
-@@ -3467,7 +3488,13 @@
+@@ -3467,7 +3485,12 @@
      {
  		// Don't do any motion/movement stuff if we don't have kb focus
  		if ( !m_pBackend->m_bPointerLocked || ( !cv_wayland_mouse_relmotion_without_keyboard_focus && !m_bKeyboardEntered ) )
 +		{
 +			static int s_nDropped = 0;
 +			if ( ++s_nDropped <= 20 || s_nDropped % 200 == 0 )
-+				ddrel_log( "drop motion #%d locked %d kb %d
-+", s_nDropped, (int)m_pBackend->m_bPointerLocked, (int)m_bKeyboardEntered );
++				ddrel_log( "drop motion #%d locked %d kb %d\n", s_nDropped, (int)m_pBackend->m_bPointerLocked, (int)m_bKeyboardEntered );
  			return;
 +		}
  

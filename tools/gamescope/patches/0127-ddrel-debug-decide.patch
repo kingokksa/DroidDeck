@@ -1,6 +1,6 @@
 --- a/src/steamcompmgr.cpp
 +++ b/src/steamcompmgr.cpp
-@@ -10819,6 +10819,27 @@
+@@ -10819,6 +10819,26 @@
  
  				const bool bRelativeMouseMode = bForcedRelativeMouse || ( bImageEmpty && bHasPointerConstraint && !bExcludedAppId );
  
@@ -10,14 +10,13 @@
 +					static bool s_bLastCv = false;
 +					if ( bRelativeMouseMode != s_bLastMode || uAppId != s_uLastAppId || cv_relative_mouse.Get() != s_bLastCv )
 +					{
-+						if ( FILE *pF = fopen( "/tmp/ddrel.log", "a" ) )
++						if ( FILE *pDDREL = fopen( "/tmp/ddrel.log", "a" ) )
 +						{
-+							fprintf( pF, "decide mode %d (cv %d forced %d imageEmpty %d constrained %d excluded %d) appid %u steam %d
-+",
++							fprintf( pDDREL, "decide mode %d (cv %d forced %d imageEmpty %d constrained %d excluded %d) appid %u steam %d\n",
 +								(int)bRelativeMouseMode, (int)cv_relative_mouse.Get(), (int)bForcedRelativeMouse,
 +								(int)bImageEmpty, (int)bHasPointerConstraint, (int)bExcludedAppId,
 +								uAppId, (int)window_is_steam( pPaintFocus->inputFocusWindow ) );
-+							fclose( pF );
++							fclose( pDDREL );
 +						}
 +						s_bLastMode = bRelativeMouseMode;
 +						s_uLastAppId = uAppId;
