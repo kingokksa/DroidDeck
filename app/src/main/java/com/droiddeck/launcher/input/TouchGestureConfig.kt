@@ -39,7 +39,7 @@ data class TouchGestureConfig(
     val showGestureDebugOverlay: Boolean = false,
     val gestureThreshold: Int = DEFAULT_GESTURE_THRESHOLD,
     val mouseDragMovementMode: String = MOUSE_DRAG_MOVEMENT_DIRECT,
-    val relativeMouse: Boolean = false,
+    val relativeMouseMode: Int = RELATIVE_MOUSE_AUTO,
 ) {
 
     fun toJson(): String {
@@ -76,7 +76,7 @@ data class TouchGestureConfig(
             put(KEY_SHOW_GESTURE_DEBUG_OVERLAY, showGestureDebugOverlay)
             put(KEY_GESTURE_THRESHOLD, gestureThreshold)
             put(KEY_MOUSE_DRAG_MOVEMENT_MODE, mouseDragMovementMode)
-            put(KEY_RELATIVE_MOUSE, relativeMouse)
+            put(KEY_RELATIVE_MOUSE_MODE, relativeMouseMode)
         }.toString()
     }
 
@@ -93,6 +93,10 @@ data class TouchGestureConfig(
 
         const val MOUSE_DRAG_MOVEMENT_DIRECT = "direct"
         const val MOUSE_DRAG_MOVEMENT_RELATIVE = "relative"
+
+        const val RELATIVE_MOUSE_AUTO = 0
+        const val RELATIVE_MOUSE_ON = 1
+        const val RELATIVE_MOUSE_OFF = 2
         const val ACTION_SHOW_KEYBOARD = "show_keyboard"
         const val ACTION_KEY_ESC = "key_ESC"
         const val ACTION_KEY_TILDE = "key_TILDE"
@@ -116,6 +120,7 @@ data class TouchGestureConfig(
         private const val KEY_LONG_PRESS_MOUSE_BEHAVIOR = "longPressMouseBehavior"
         private const val KEY_LONG_PRESS_DELAY = "longPressDelay"
         private const val KEY_DIRECT_HOLD_BEHAVIOR = "directHoldBehavior"
+        private const val KEY_RELATIVE_MOUSE_MODE = "relativeMouseMode"
         private const val KEY_RELATIVE_MOUSE = "relativeMouse"
         private const val KEY_DOUBLE_TAP_ENABLED = "doubleTapEnabled"
         private const val KEY_DOUBLE_TAP_DELAY = "doubleTapDelay"
@@ -194,7 +199,10 @@ data class TouchGestureConfig(
                     mouseDragMovementMode = normalizeMouseDragMovementMode(
                         obj.optString(KEY_MOUSE_DRAG_MOVEMENT_MODE, MOUSE_DRAG_MOVEMENT_DIRECT),
                     ),
-                    relativeMouse = obj.optBoolean(KEY_RELATIVE_MOUSE, false),
+                    relativeMouseMode = normalizeRelativeMouseMode(
+                        if (obj.has(KEY_RELATIVE_MOUSE_MODE)) obj.optInt(KEY_RELATIVE_MOUSE_MODE, RELATIVE_MOUSE_AUTO)
+                        else if (obj.optBoolean(KEY_RELATIVE_MOUSE, false)) RELATIVE_MOUSE_ON else RELATIVE_MOUSE_AUTO,
+                    ),
                 )
             } catch (_: Exception) {
                 fallbackDefaults()
@@ -207,6 +215,10 @@ data class TouchGestureConfig(
 
         private fun normalizeMouseBehavior(value: String): String {
             return if (value == MOUSE_BEHAVIOR_CLICK) MOUSE_BEHAVIOR_CLICK else MOUSE_BEHAVIOR_HOLD
+        }
+
+        private fun normalizeRelativeMouseMode(mode: Int): Int {
+            return if (mode in RELATIVE_MOUSE_AUTO..RELATIVE_MOUSE_OFF) mode else RELATIVE_MOUSE_AUTO
         }
 
         private fun normalizeMouseDragMovementMode(mode: String?): String {

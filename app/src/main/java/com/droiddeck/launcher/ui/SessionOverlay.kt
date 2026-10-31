@@ -270,8 +270,8 @@ class DrawerActions(
     val onLowLatency: (Boolean) -> Unit = {},
     val evdevMouse: Boolean = false,
     val onEvdevMouse: (Boolean) -> Unit = {},
-    val relativeMouse: Boolean = false,
-    val onRelativeMouse: (Boolean) -> Unit = {},
+    val relativeMouseMode: Int = 0,
+    val onRelativeMouseMode: (Int) -> Unit = {},
     val directCursor: Boolean = false,
     val onDirectCursor: (Boolean) -> Unit = {},
     val onTouch: (String) -> Unit,
@@ -588,9 +588,11 @@ internal fun SessionDrawer(open: Boolean, requestedPage: SessionDrawerPage, cont
                                     listOf(SessionPrefs.TOUCH_AUTO to stringResource(R.string.drawer_touch_auto, a.touchAuto), SessionPrefs.TOUCH_PAD to stringResource(R.string.mode_touch_touchpad), SessionPrefs.TOUCH_DIRECT to stringResource(R.string.mode_touch_direct), SessionPrefs.TOUCH_GESTURES to stringResource(R.string.mode_touch_gestures), SessionPrefs.TOUCH_OFF to stringResource(R.string.widgets_off)),
                                     a.touchMode, chipModifier = focus.track(page, "touch"), onPick = a.onTouch)
                                 if (a.touchActive == SessionPrefs.TOUCH_PAD)
-                                    ToggleRow(host, "relative-mouse", stringResource(R.string.drawer_relative_mouse),
-                                        null, a.relativeMouse,
-                                        chipModifier = focus.track(page, "relative-mouse"), onChange = a.onRelativeMouse)
+                                    ChoiceRow(host, "relative-mouse", stringResource(R.string.drawer_relative_mouse), null,
+                                        listOf(com.droiddeck.launcher.input.TouchGestureConfig.RELATIVE_MOUSE_AUTO to stringResource(R.string.drawer_relative_mouse_auto),
+                                            com.droiddeck.launcher.input.TouchGestureConfig.RELATIVE_MOUSE_ON to stringResource(R.string.drawer_relative_mouse_on),
+                                            com.droiddeck.launcher.input.TouchGestureConfig.RELATIVE_MOUSE_OFF to stringResource(R.string.drawer_relative_mouse_off)),
+                                        a.relativeMouseMode, chipModifier = focus.track(page, "relative-mouse"), onPick = a.onRelativeMouseMode)
                                 if (a.touchActive == SessionPrefs.TOUCH_DIRECT)
                                     ToggleRow(host, "direct-cursor", stringResource(R.string.drawer_direct_cursor),
                                         null, a.directCursor,
@@ -669,9 +671,11 @@ internal fun SessionDrawer(open: Boolean, requestedPage: SessionDrawerPage, cont
                                     null, a.evdevMouse,
                                     chipModifier = focus.track(page, "evdev-mouse"), onChange = a.onEvdevMouse)
                                 if (a.touchActive != SessionPrefs.TOUCH_PAD)
-                                    ToggleRow(host, "relative-mouse", stringResource(R.string.drawer_relative_mouse),
-                                        null, a.relativeMouse,
-                                        chipModifier = focus.track(page, "relative-mouse"), onChange = a.onRelativeMouse)
+                                    ChoiceRow(host, "relative-mouse", stringResource(R.string.drawer_relative_mouse), null,
+                                        listOf(com.droiddeck.launcher.input.TouchGestureConfig.RELATIVE_MOUSE_AUTO to stringResource(R.string.drawer_relative_mouse_auto),
+                                            com.droiddeck.launcher.input.TouchGestureConfig.RELATIVE_MOUSE_ON to stringResource(R.string.drawer_relative_mouse_on),
+                                            com.droiddeck.launcher.input.TouchGestureConfig.RELATIVE_MOUSE_OFF to stringResource(R.string.drawer_relative_mouse_off)),
+                                        a.relativeMouseMode, chipModifier = focus.track(page, "relative-mouse"), onPick = a.onRelativeMouseMode)
                             }
                             SettingsGroup(stringResource(R.string.drawer_keyboard)) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().padding(8.dp)) {

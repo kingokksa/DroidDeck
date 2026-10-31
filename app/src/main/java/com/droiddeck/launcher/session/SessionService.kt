@@ -748,10 +748,10 @@ class SessionService : Service() {
         return sessionDir
     }
 
-    private fun relativeMouseForSession(): Boolean {
+    private fun relativeMouseForSession(): Int {
         val game = SessionState.gameId?.toLongOrNull()?.toString()
             ?: SessionState.program?.let { "program:$it" }
-        return game != null && com.droiddeck.launcher.input.GesturePrefs.read(this, game).relativeMouse
+        return game?.let { com.droiddeck.launcher.input.GesturePrefs.read(this, it).relativeMouseMode } ?: 0
     }
 
     private fun addClientEnvironment(guest: MutableList<String>, steamHere: Boolean, agentEnvironment: List<String>) {
@@ -818,9 +818,7 @@ class SessionService : Service() {
         guest.add("BL_FSYNC_FIRST=" + (if (SessionPrefs.fsyncFirst(this)) "1" else "0"))
         guest.add("BL_GAMESCOPE_REALTIME=" + (if (SessionPrefs.gamescopeRealtime(this)) "1" else "0"))
         if (SessionPrefs.cursorComposite(this)) guest.add("BL_CURSOR_COMPOSITE=1")
-        // gamescope reads gamescope_<convar>= from the environment; the convar is a plain bool, so no
-        // per-game list has to reach it. The drawer switches it for the running session.
-        if (relativeMouseForSession()) guest.add("gamescope_relative_mouse=1")
+        relativeMouseForSession().takeIf { it != 0 }?.let { guest.add("gamescope_relative_mouse=$it") }
         if (com.droiddeck.launcher.core.ZramSupport.supported()) {
             guest.add("BL_ZRAM=1")
             if (steamHere) SessionPrefs.ramCapMb(this).takeIf { it > 0 }?.let { guest.add("BL_RAM_CAP_MB=$it") }
