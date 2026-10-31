@@ -602,6 +602,9 @@ internal fun SessionDrawer(open: Boolean, requestedPage: SessionDrawerPage, cont
                                         a.directHoldBehavior, chipModifier = focus.track(page, "long-press"),
                                         onPick = a.onDirectHoldBehavior)
                                 }
+                                if (a.touchActive == SessionPrefs.TOUCH_PAD) ToggleRow(host, "relative-mouse",
+                                    stringResource(R.string.drawer_relative_mouse), null, a.relativeMouse,
+                                    chipModifier = focus.track(page, "relative-mouse"), onChange = a.onRelativeMouse)
                                 if (a.onScreenKeys != null) {
                                     SettingsRow(stringResource(R.string.screen_keys), null, stacked = narrow) {
                                         Row(
@@ -664,7 +667,7 @@ internal fun SessionDrawer(open: Boolean, requestedPage: SessionDrawerPage, cont
                                 ToggleRow(host, "evdev-mouse", stringResource(R.string.drawer_evdev_mouse),
                                     null, a.evdevMouse,
                                     chipModifier = focus.track(page, "evdev-mouse"), onChange = a.onEvdevMouse)
-                                ToggleRow(host, "relative-mouse",
+                                if (a.touchActive != SessionPrefs.TOUCH_PAD) ToggleRow(host, "relative-mouse",
                                     stringResource(R.string.drawer_relative_mouse), null, a.relativeMouse,
                                     chipModifier = focus.track(page, "relative-mouse"), onChange = a.onRelativeMouse)
                             }
