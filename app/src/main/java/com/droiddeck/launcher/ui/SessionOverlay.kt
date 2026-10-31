@@ -664,7 +664,7 @@ internal fun SessionDrawer(open: Boolean, requestedPage: SessionDrawerPage, cont
                                 ToggleRow(host, "evdev-mouse", stringResource(R.string.drawer_evdev_mouse),
                                     null, a.evdevMouse,
                                     chipModifier = focus.track(page, "evdev-mouse"), onChange = a.onEvdevMouse)
-                                if (a.selectedGameProfileId != null) ToggleRow(host, "relative-mouse",
+                                ToggleRow(host, "relative-mouse",
                                     stringResource(R.string.drawer_relative_mouse), null, a.relativeMouse,
                                     chipModifier = focus.track(page, "relative-mouse"), onChange = a.onRelativeMouse)
                             }
