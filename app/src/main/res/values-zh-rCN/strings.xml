@@ -3338,8 +3338,6 @@
     <string name="hud_metric_low01">0.1% 最低帧</string>
     <string name="hud_metric_display">显示服务</string>
     <string name="hud_metric_hdr">HDR 状态</string>
-    <string name="hud_move_up">上移</string>
-    <string name="hud_move_down">下移</string>
     <string name="hud_readings_edit">Change readings</string>
     <string name="hud_readings_title">Readings</string>
     <string name="hud_readings_on">Shown</string>
