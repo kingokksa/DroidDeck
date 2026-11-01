@@ -3386,12 +3386,12 @@
     <string name="gog_repair_action">Perbaiki file</string>
     <string name="gog_refresh_action">Segarkan instalasi</string>
     <string name="gog_select_patch">Pilih</string>
-    <string name="hud_metric_latency">Frame time</string>
-    <string name="hud_metric_avg">Average frame rate</string>
+    <string name="hud_metric_latency">Waktu frame</string>
+    <string name="hud_metric_avg">Rata-rata laju frame</string>
     <string name="hud_metric_low1">1% low</string>
     <string name="hud_metric_low01">0.1% low</string>
-    <string name="hud_metric_display">Display server</string>
-    <string name="hud_metric_hdr">HDR state</string>
-    <string name="hud_readings_shown">Shown</string>
-    <string name="hud_readings_count">%1$d of %2$d</string>
+    <string name="hud_metric_display">Server tampilan</string>
+    <string name="hud_metric_hdr">Status HDR</string>
+    <string name="hud_readings_shown">Ditampilkan</string>
+    <string name="hud_readings_count">%1$d dari %2$d</string>
 </resources>

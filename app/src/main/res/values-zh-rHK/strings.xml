@@ -3334,10 +3334,10 @@
     <string name="gog_select_patch">選擇</string>
     <string name="hud_metric_latency">幀時間</string>
     <string name="hud_metric_avg">平均幀率</string>
-    <string name="hud_metric_low1">1% 最低幀</string>
-    <string name="hud_metric_low01">0.1% 最低幀</string>
+    <string name="hud_metric_low1">1% low</string>
+    <string name="hud_metric_low01">0.1% low</string>
     <string name="hud_metric_display">顯示服務</string>
     <string name="hud_metric_hdr">HDR 狀態</string>
-    <string name="hud_readings_shown">Shown</string>
-    <string name="hud_readings_count">%1$d of %2$d</string>
+    <string name="hud_readings_shown">已顯示</string>
+    <string name="hud_readings_count">%1$d / %2$d</string>
 </resources>

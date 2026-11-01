@@ -3386,12 +3386,12 @@
     <string name="gog_repair_action">파일 복구</string>
     <string name="gog_refresh_action">설치 새로 고침</string>
     <string name="gog_select_patch">선택</string>
-    <string name="hud_metric_latency">Frame time</string>
-    <string name="hud_metric_avg">Average frame rate</string>
+    <string name="hud_metric_latency">프레임 시간</string>
+    <string name="hud_metric_avg">평균 프레임 속도</string>
     <string name="hud_metric_low1">1% low</string>
     <string name="hud_metric_low01">0.1% low</string>
-    <string name="hud_metric_display">Display server</string>
-    <string name="hud_metric_hdr">HDR state</string>
-    <string name="hud_readings_shown">Shown</string>
-    <string name="hud_readings_count">%1$d of %2$d</string>
+    <string name="hud_metric_display">디스플레이 서버</string>
+    <string name="hud_metric_hdr">HDR 상태</string>
+    <string name="hud_readings_shown">표시됨</string>
+    <string name="hud_readings_count">%2$d 중 %1$d</string>
 </resources>
