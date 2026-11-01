@@ -760,8 +760,9 @@ class DroidDeckHudView(context: Context) : View(context) {
     }
 
     private fun buildFull(s: HudMetrics.Snapshot) {
-        val rowPx = sp(12f); val unitPx = rowPx * 0.62f
-        val pad = sp(10f); val lineGap = sp(4f); val lvGap = sp(8f)
+        val st = size.style
+        val rowPx = sp(st.row); val unitPx = sp(st.unit)
+        val pad = sp(st.pad); val lineGap = sp(st.lineGap); val lvGap = sp(st.labelGap)
         val ordered = ArrayList<Pair<String, HudRow>>()
         fun add(key: String, row: HudRow?) { if (row != null) ordered.add(Pair(key, row)) }
 
@@ -856,8 +857,9 @@ class DroidDeckHudView(context: Context) : View(context) {
     }
 
     private fun buildTiles(s: HudMetrics.Snapshot) {
-        val keyPx = sp(10f); val valPx = sp(18f); val subPx = sp(10f); val unitPx = sp(11f)
-        val pad = sp(9f); val innerPad = sp(8f); val tileGap = sp(6f); val lineGap = sp(4f)
+        val st = size.style
+        val keyPx = sp(st.key); val valPx = sp(st.row); val subPx = sp(st.sub); val unitPx = sp(st.unit)
+        val pad = sp(st.pad); val innerPad = sp(st.innerPad); val tileGap = sp(st.tileGap); val lineGap = sp(st.lineGap)
 
         class Tile(val key: String, val keyColor: Int, val value: List<Span>, val sub: String?, val wide: Boolean)
         val tiles = ArrayList<Tile>()
@@ -951,8 +953,9 @@ class DroidDeckHudView(context: Context) : View(context) {
     }
 
     private fun buildPill(s: HudMetrics.Snapshot) {
-        val bigPx = sp(30f); val bigUnitPx = bigPx * 0.36f; val stkPx = sp(11.5f)
-        val pad = sp(10f); val midGap = sp(12f); val stkLineGap = sp(3f)
+        val st = size.style
+        val bigPx = sp(st.row); val bigUnitPx = sp(st.unit); val stkPx = sp(st.sub)
+        val pad = sp(st.pad); val midGap = sp(st.labelGap); val stkLineGap = sp(st.lineGap)
 
         val left = ArrayList<Span>()
         // "30->118" is roughly three times the width of "30", and the pill's
@@ -1067,7 +1070,8 @@ class DroidDeckHudView(context: Context) : View(context) {
     // One column as wide as the widest row: the logo, FPS, lows, graph and engine line start on its left
     // edge (ink, not advance), and the header keeps the same space above and below the logo.
     private fun buildMinimal(s: HudMetrics.Snapshot) {
-        val bigPx = sp(34f); val bigUnitPx = bigPx * 0.32f; val subPx = sp(11.5f); val footPx = sp(9.5f)
+        val st = size.style
+        val bigPx = sp(st.row); val bigUnitPx = sp(st.unit); val subPx = sp(st.sub); val footPx = sp(st.foot)
         val stroke = outlineWidth()
         val left = contentLeft()
         val inner = panelInset() + stroke
@@ -1187,8 +1191,9 @@ class DroidDeckHudView(context: Context) : View(context) {
     }
 
     private fun buildMega(s: HudMetrics.Snapshot) {
-        val rowPx = sp(11.5f); val unitPx = rowPx * 0.62f; val bandPx = sp(9.5f)
-        val pad = sp(10f); val lineGap = sp(3.5f); val lvGap = sp(7f); val gutter = sp(16f)
+        val st = size.style
+        val rowPx = sp(st.row); val unitPx = sp(st.unit); val bandPx = sp(st.band)
+        val pad = sp(st.pad); val lineGap = sp(st.lineGap); val lvGap = sp(st.labelGap); val gutter = sp(st.gutter)
 
         // ---- Every row in one list; the columns are dealt from it further down ----
         val left = ArrayList<Pair<String, HudRow>>()
@@ -1510,44 +1515,7 @@ class DroidDeckHudView(context: Context) : View(context) {
 
     internal val isDragging: Boolean get() = lockController.isDragging()
 
-    companion object {
-        /**
-         * The rows each size draws, in the order it draws them before the user moves any. A size ignores
-         * every switch outside its set, so the settings screen offers only these and the HUD cannot be
-         * asked for a row it has no room for. Kept here, beside the builders, because it is a fact about
-         * the drawing code: [buildFull] and the rest each draw exactly what their entry lists.
-         */
-        val ROWS: Map<DroidDeckHudSize, List<String>> = mapOf(
-            DroidDeckHudSize.FULL to listOf(
-                "showGpuModel", "showDisplay", "showHdr", "showGPULoad", "showCPUUsage", "showVram",
-                "showRAM", "showBattery", "showFPS", "showAvg", "showLow1", "showLow01", "showLow001",
-            ),
-            DroidDeckHudSize.TILES to listOf(
-                "showFPS", "showLatency", "showGPULoad", "showCPUUsage", "showVram", "showRAM",
-                "showEngine", "showDisplay", "showHdr", "showAvg", "showLow1", "showLow01", "showLow001",
-                "showGpuModel", "showBattery",
-            ),
-            DroidDeckHudSize.PILL to listOf(
-                "showFPS", "showGpuModel", "showGPULoad", "showCPUUsage", "showRAM", "showBattery",
-                "showLatency", "showDisplay", "showVram", "showHdr",
-            ),
-            DroidDeckHudSize.MINIMAL to listOf(
-                "showFPS", "showLow1", "showLow01", "showLow001", "showAvg", "showLatency",
-                "showEngine", "showDisplay", "showHdr",
-            ),
-            DroidDeckHudSize.MEGA to listOf(
-                "showGpuModel", "showGPULoad", "showCPUUsage", "showPerCore", "showVram", "showRAM",
-                "showSwap", "showNet", "showBattery", "showFPS", "showAvg", "showLow1", "showLow01",
-                "showLow001", "showResolution", "showDisplay", "showHdr", "showProton", "showSession",
-            ),
-        )
-
-        /** The rows a size draws, in their current order, for the settings screen to list. */
-        fun rowsFor(size: DroidDeckHudSize, values: Map<String, String>): List<String> {
-            val supported = ROWS[size].orEmpty()
-            return DroidDeckHudConfig.order(values).filter { it in supported }
-        }
-
+    private companion object {
         const val REFRESH_MS = 500L
         const val MIN_SCALE = 0.5f
         const val MAX_SCALE = 2f

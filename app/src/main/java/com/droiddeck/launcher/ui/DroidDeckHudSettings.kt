@@ -14,7 +14,6 @@ import androidx.compose.ui.unit.sp
 import com.droiddeck.launcher.R
 import com.droiddeck.launcher.hud.DroidDeckHudConfig
 import com.droiddeck.launcher.hud.DroidDeckHudSize
-import com.droiddeck.launcher.hud.DroidDeckHudView
 
 /** Bannerlator's DroidDeck HUD settings (DeckOverlaySettings): one row per key of the HUD's config string. */
 @Composable
@@ -63,7 +62,7 @@ internal fun DroidDeckHudSettings(host: MenuHost, a: DrawerActions, track: (Stri
     SettingsGroup(stringResource(R.string.hud_group_metrics)) {
         ActionRow(stringResource(R.string.hud_group_metrics), null, stringResource(R.string.common_edit),
             onClick = { editing = true }, modifier = track("hud-readings"))
-        val rows = DroidDeckHudView.rowsFor(DroidDeckHudSize.from(cfg["hudSize"]), cfg)
+        val rows = DroidDeckHudSize.rowsFor(DroidDeckHudSize.from(cfg["hudSize"]), cfg)
         SettingsRow(stringResource(R.string.hud_readings_shown), null) {
             Text(stringResource(R.string.hud_readings_count, rows.count { on(it) }, rows.size),
                 fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
