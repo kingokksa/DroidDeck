@@ -1510,7 +1510,44 @@ class DroidDeckHudView(context: Context) : View(context) {
 
     internal val isDragging: Boolean get() = lockController.isDragging()
 
-    private companion object {
+    companion object {
+        /**
+         * The rows each size draws, in the order it draws them before the user moves any. A size ignores
+         * every switch outside its set, so the settings screen offers only these and the HUD cannot be
+         * asked for a row it has no room for. Kept here, beside the builders, because it is a fact about
+         * the drawing code: [buildFull] and the rest each draw exactly what their entry lists.
+         */
+        val ROWS: Map<DroidDeckHudSize, List<String>> = mapOf(
+            DroidDeckHudSize.FULL to listOf(
+                "showGpuModel", "showDisplay", "showHdr", "showGPULoad", "showCPUUsage", "showVram",
+                "showRAM", "showBattery", "showFPS", "showAvg", "showLow1", "showLow01", "showLow001",
+            ),
+            DroidDeckHudSize.TILES to listOf(
+                "showFPS", "showLatency", "showGPULoad", "showCPUUsage", "showVram", "showRAM",
+                "showEngine", "showDisplay", "showHdr", "showAvg", "showLow1", "showLow01", "showLow001",
+                "showGpuModel", "showBattery",
+            ),
+            DroidDeckHudSize.PILL to listOf(
+                "showFPS", "showGpuModel", "showGPULoad", "showCPUUsage", "showRAM", "showBattery",
+                "showLatency", "showDisplay", "showVram", "showHdr",
+            ),
+            DroidDeckHudSize.MINIMAL to listOf(
+                "showFPS", "showLow1", "showLow01", "showLow001", "showAvg", "showLatency",
+                "showEngine", "showDisplay", "showHdr",
+            ),
+            DroidDeckHudSize.MEGA to listOf(
+                "showGpuModel", "showGPULoad", "showCPUUsage", "showPerCore", "showVram", "showRAM",
+                "showSwap", "showNet", "showBattery", "showFPS", "showAvg", "showLow1", "showLow01",
+                "showLow001", "showResolution", "showDisplay", "showHdr", "showProton", "showSession",
+            ),
+        )
+
+        /** The rows a size draws, in their current order, for the settings screen to list. */
+        fun rowsFor(size: DroidDeckHudSize, values: Map<String, String>): List<String> {
+            val supported = ROWS[size].orEmpty()
+            return DroidDeckHudConfig.order(values).filter { it in supported }
+        }
+
         const val REFRESH_MS = 500L
         const val MIN_SCALE = 0.5f
         const val MAX_SCALE = 2f
