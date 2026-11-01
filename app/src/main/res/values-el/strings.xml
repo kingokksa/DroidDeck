@@ -3414,4 +3414,12 @@
     <string name="gog_repair_action">Επιδιόρθωση αρχείων</string>
     <string name="gog_refresh_action">Ανανέωση εγκατάστασης</string>
     <string name="gog_select_patch">Επιλογή</string>
+    <string name="hud_metric_latency">Frame time</string>
+    <string name="hud_metric_avg">Average frame rate</string>
+    <string name="hud_metric_low1">1% low</string>
+    <string name="hud_metric_low01">0.1% low</string>
+    <string name="hud_metric_display">Display server</string>
+    <string name="hud_metric_hdr">HDR state</string>
+    <string name="hud_move_up">Move up</string>
+    <string name="hud_move_down">Move down</string>
 </resources>

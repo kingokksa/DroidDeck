@@ -3451,4 +3451,12 @@
     <string name="gog_repair_action">Réparer les fichiers</string>
     <string name="gog_refresh_action">Actualiser l\'installation</string>
     <string name="gog_select_patch">Sélectionner</string>
+    <string name="hud_metric_latency">Frame time</string>
+    <string name="hud_metric_avg">Average frame rate</string>
+    <string name="hud_metric_low1">1% low</string>
+    <string name="hud_metric_low01">0.1% low</string>
+    <string name="hud_metric_display">Display server</string>
+    <string name="hud_metric_hdr">HDR state</string>
+    <string name="hud_move_up">Move up</string>
+    <string name="hud_move_down">Move down</string>
 </resources>
