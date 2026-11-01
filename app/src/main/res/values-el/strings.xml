@@ -662,7 +662,7 @@
     <string name="hud_outline_color">Χρώμα περιγράμματος</string>
     <string name="hud_outline_gray">Γκρι</string>
     <string name="hud_outline_theme">Χρώμα θέματος</string>
-    <string name="hud_group_metrics">Μετρήσεις</string>
+    <string name="hud_group_metrics">Πληροφορίες HUD</string>
     <string name="hud_metric_graph">Γράφημα χρόνου καρέ</string>
     <string name="hud_metric_decimal">Ρυθμός καρέ με δεκαδικό</string>
     <string name="hud_metric_low001">0.01% χαμηλότερα</string>
@@ -3420,7 +3420,4 @@
     <string name="hud_metric_low01">0.1% low</string>
     <string name="hud_metric_display">Display server</string>
     <string name="hud_metric_hdr">HDR state</string>
-    <string name="hud_readings_edit">Change readings</string>
-    <string name="hud_readings_title">Readings</string>
-    <string name="hud_readings_restore">Restore</string>
 </resources>

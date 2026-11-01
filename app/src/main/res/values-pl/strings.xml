@@ -666,7 +666,7 @@
     <string name="hud_outline_color">Kolor obrysu</string>
     <string name="hud_outline_gray">Szary</string>
     <string name="hud_outline_theme">Kolor motywu</string>
-    <string name="hud_group_metrics">Odczyty</string>
+    <string name="hud_group_metrics">Informacje HUD</string>
     <string name="hud_metric_graph">Wykres czasu klatek</string>
     <string name="hud_metric_decimal">Liczba klatek z miejscem po przecinku</string>
     <string name="hud_metric_low001">0.01% najniższych</string>
@@ -3494,7 +3494,4 @@
     <string name="hud_metric_low01">0.1% low</string>
     <string name="hud_metric_display">Display server</string>
     <string name="hud_metric_hdr">HDR state</string>
-    <string name="hud_readings_edit">Change readings</string>
-    <string name="hud_readings_title">Readings</string>
-    <string name="hud_readings_restore">Restore</string>
 </resources>

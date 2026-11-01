@@ -670,7 +670,7 @@
     <string name="hud_outline_color">لون الحد الخارجي</string>
     <string name="hud_outline_gray">رمادي</string>
     <string name="hud_outline_theme">لون المظهر</string>
-    <string name="hud_group_metrics">القراءات</string>
+    <string name="hud_group_metrics">معلومات HUD</string>
     <string name="hud_metric_graph">مخطط زمن الإطار</string>
     <string name="hud_metric_decimal">معدل الإطارات بخانة عشرية</string>
     <string name="hud_metric_low001">أدنى 0.01%</string>
@@ -3568,7 +3568,4 @@
     <string name="hud_metric_low01">0.1% low</string>
     <string name="hud_metric_display">Display server</string>
     <string name="hud_metric_hdr">HDR state</string>
-    <string name="hud_readings_edit">Change readings</string>
-    <string name="hud_readings_title">Readings</string>
-    <string name="hud_readings_restore">Restore</string>
 </resources>

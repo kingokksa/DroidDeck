@@ -664,7 +664,7 @@
     <string name="hud_outline_color">Cor do contorno</string>
     <string name="hud_outline_gray">Cinzento</string>
     <string name="hud_outline_theme">Cor do tema</string>
-    <string name="hud_group_metrics">Leituras</string>
+    <string name="hud_group_metrics">Informações do HUD</string>
     <string name="hud_metric_graph">Gráfico de tempo de fotograma</string>
     <string name="hud_metric_decimal">Taxa de fotogramas com decimal</string>
     <string name="hud_metric_low001">0.01% mais baixo</string>
@@ -3457,7 +3457,4 @@
     <string name="hud_metric_low01">0.1% low</string>
     <string name="hud_metric_display">Display server</string>
     <string name="hud_metric_hdr">HDR state</string>
-    <string name="hud_readings_edit">Change readings</string>
-    <string name="hud_readings_title">Readings</string>
-    <string name="hud_readings_restore">Restore</string>
 </resources>
