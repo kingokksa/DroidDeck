@@ -4722,6 +4722,8 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback, com.droidde
         if (route != touchRoute) {
             Log.i(TAG, "touch route $touchRoute -> $route (mode=$routedTouchMode steamUi=${SessionState.steamUi} scrollLayer=$scrollTouchGesture)")
             touchRoute = route
+            if (route == com.droiddeck.launcher.input.TouchRouter.Route.BLOCKED ||
+                route == com.droiddeck.launcher.input.TouchRouter.Route.OFF) cancelTouchStreams()
         }
         return when (route) {
             com.droiddeck.launcher.input.TouchRouter.Route.BLOCKED,
@@ -4755,6 +4757,15 @@ class SessionActivity : ComponentActivity(), SurfaceHolder.Callback, com.droidde
 
     private fun uiBlocksTouch(): Boolean =
         drawerOpen || achievementsOpen || gestureSettingsOpen || inputSettingsOpen || pipUi || SessionState.suspended
+
+    private fun cancelTouchStreams() {
+        if (::touchscreenGestures.isInitialized) touchscreenGestures.cancel()
+        if (::touchpad.isInitialized) touchpad.cancel()
+        if (::scrollTouch.isInitialized) scrollTouch.cancel()
+        if (::directTouchHold.isInitialized) directTouchHold.cancel()
+        if (::twoFingerGestures.isInitialized) twoFingerGestures.cancel()
+        heldButtons.release(1 or 16)
+    }
 
     private fun fingerTouchSnapshot(uiBlocking: Boolean) = com.droiddeck.launcher.input.TouchRouter.Snapshot(
         uiBlocking = uiBlocking,

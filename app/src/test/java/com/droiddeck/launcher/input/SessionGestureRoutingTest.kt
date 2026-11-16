@@ -181,6 +181,33 @@ class SessionGestureRoutingTest {
         }
     }
 
+    @Test fun blockedTouchRouteReleasesHeldGestureKey() {
+        startLongPress()
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(350))
+        assertEquals(listOf(18 to true), keys)
+        SessionState.suspended = true
+        val now = SystemClock.uptimeMillis()
+        MotionEvent.obtain(now, now, MotionEvent.ACTION_UP, 400f, 300f, 0).also {
+            try { assertTrue(activity.onTouchEvent(it)) } finally { it.recycle() }
+        }
+        assertEquals(listOf(18 to true, 18 to false), keys)
+    }
+
+    @Test fun blockedTouchRouteReleasesHeldDirectTouchButton() {
+        prepare(SessionPrefs.TOUCH_DIRECT, TouchGestureConfig(longPressEnabled = true, longPressAction = "key_E"))
+        val now = SystemClock.uptimeMillis()
+        MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, 400f, 300f, 0).also {
+            try { assertTrue(activity.onTouchEvent(it)) } finally { it.recycle() }
+        }
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(320))
+        assertEquals(listOf(PointerGestures.BTN_RIGHT to true), directButtons)
+        SessionState.suspended = true
+        MotionEvent.obtain(now, now, MotionEvent.ACTION_UP, 400f, 300f, 0).also {
+            try { assertTrue(activity.onTouchEvent(it)) } finally { it.recycle() }
+        }
+        assertEquals(listOf(PointerGestures.BTN_RIGHT to true, PointerGestures.BTN_RIGHT to false), directButtons)
+    }
+
     private fun startLongPress() {
         prepare(SessionPrefs.TOUCH_GESTURES, TouchGestureConfig(longPressEnabled = true, longPressAction = "key_E"))
         val now = SystemClock.uptimeMillis()
