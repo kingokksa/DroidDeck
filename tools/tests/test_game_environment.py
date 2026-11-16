@@ -3196,10 +3196,70 @@ class ForeignSystemDllTest(unittest.TestCase):
             self.assertEqual([], self.run_repair(compat, proton))
             self.assertEqual(0x8664, MODULE["pe_machine"](windows / "system32/ucrtbase.dll"))
             self.assertEqual([], self.run_repair(Path(tmp) / "missing", proton))
+class GameLocaleTest(unittest.TestCase):
+    def run_game_locale(self, env, present=(), configured=False):
+        g = MODULE["game_locale"].__globals__
+        old = g["locale_present"]
+        g["locale_present"] = lambda name: name in present
+        try:
+            return MODULE["game_locale"](dict(env), configured)
+        finally:
+            g["locale_present"] = old
 
+    def test_a_game_without_a_locale_keeps_the_session_one(self):
+        session = {"LANG": "zh_CN.UTF-8", "HOME": "/root"}
+        self.assertEqual(self.run_game_locale(session), session)
+        self.assertEqual(self.run_game_locale(dict(session, DROIDDECK_LOCALE="C.UTF-8")),
+                         dict(session, DROIDDECK_LOCALE="C.UTF-8"))
 
-if __name__ == "__main__":
-    unittest.main()
+    def test_a_chosen_locale_replaces_the_session_one(self):
+        session = {"LANG": "zh_CN.UTF-8", "HOME": "/root"}
+        chosen = self.run_game_locale(dict(session, DROIDDECK_LOCALE="ja_JP.UTF-8"), {"ja_JP.UTF-8"})
+        self.assertEqual((chosen["LANG"], chosen["HOME"]), ("ja_JP.UTF-8", "/root"))
+
+    def test_a_locale_the_runtime_does_not_have_keeps_the_session_one(self):
+        session = {"LANG": "zh_CN.UTF-8", "HOME": "/root"}
+        self.assertEqual(self.run_game_locale(dict(session, DROIDDECK_LOCALE="xx_XX.UTF-8")), 
+                         dict(session, DROIDDECK_LOCALE="xx_XX.UTF-8"))
+
+    def test_a_locale_that_is_not_a_name_is_ignored(self):
+        session = {"LANG": "zh_CN.UTF-8"}
+        for name in ("../passwd", "ja;rm -rf /", ""):
+            self.assertEqual(self.run_game_locale(dict(session, DROIDDECK_LOCALE=name))["LANG"], "zh_CN.UTF-8")
+
+    def test_a_lang_the_game_names_wins_even_when_it_is_the_default(self):
+        config = {"version": 1, "games": {"42": {"LANG": "C.UTF-8", "DROIDDECK_LOCALE": "ja_JP.UTF-8"}}}
+        self.assertTrue(MODULE["configured_lang"](config, "42"))
+        self.assertFalse(MODULE["configured_lang"](config, "43"))
+        named = self.run_game_locale({"LANG": "C.UTF-8", "DROIDDECK_LOCALE": "ja_JP.UTF-8"},
+                                     {"ja_JP.UTF-8"}, MODULE["configured_lang"](config, "42"))
+        self.assertEqual(named["LANG"], "C.UTF-8")
+        chosen = self.run_game_locale({"LANG": "C.UTF-8", "DROIDDECK_LOCALE": "ja_JP.UTF-8"},
+                                      {"ja_JP.UTF-8"}, MODULE["configured_lang"](config, "43"))
+        self.assertEqual(chosen["LANG"], "ja_JP.UTF-8")
+
+    def test_the_message_language_follows_the_chosen_locale(self):
+        session = {"LANG": "zh_CN.UTF-8", "LANGUAGE": "zh_CN:zh", "HOME": "/root"}
+        chosen = self.run_game_locale(dict(session, DROIDDECK_LOCALE="ja_JP.UTF-8"), {"ja_JP.UTF-8"})
+        self.assertEqual((chosen["LANG"], chosen["LANGUAGE"]), ("ja_JP.UTF-8", "ja_JP:ja"))
+
+    def test_the_message_language_keeps_the_session_priority_rules(self):
+        self.assertEqual(MODULE["locale_language"]("zh_HK.UTF-8"), "zh_HK:zh_TW:zh")
+        self.assertEqual(MODULE["locale_language"]("zh_CN.UTF-8"), "zh_CN:zh")
+        self.assertEqual(MODULE["locale_language"]("en_GB.UTF-8"), "en_GB")
+        self.assertEqual(MODULE["locale_language"]("sr_RS.UTF-8@latin"), "sr_RS:sr")
+
+    def test_a_game_that_keeps_the_session_locale_keeps_its_message_language(self):
+        session = {"LANG": "zh_CN.UTF-8", "LANGUAGE": "zh_CN:zh"}
+        self.assertEqual(self.run_game_locale(session), session)
+
+    def test_the_locale_directory_matches_the_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp) / "sr_RS.utf8@latin"
+            directory.mkdir()
+            (directory / "LC_CTYPE").write_text("")
+            self.assertTrue(MODULE["locale_present"]("sr_RS.UTF-8@latin", Path(tmp)))
+            self.assertFalse(MODULE["locale_present"]("ja_JP.UTF-8", Path(tmp)))
 
 
 class ForceSsbsTest(unittest.TestCase):

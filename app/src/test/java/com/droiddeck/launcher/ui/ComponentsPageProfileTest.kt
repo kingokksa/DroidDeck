@@ -168,7 +168,7 @@ class ComponentsPageProfileTest {
         compose.onNodeWithText(context.getString(R.string.gpu_system_powervr)).assertIsNotEnabled()
         compose.onNodeWithText(context.getString(R.string.cmgr_powervr_dxvk_managed)).assertExists()
         val inheritedChoices = compose.onAllNodesWithText(context.getString(R.string.comp_game_use_general))
-        inheritedChoices.assertCountEquals(3) // FEX package, Proton and VKD3D remain selectable.
+        inheritedChoices.assertCountEquals(3)
         repeat(3) { inheritedChoices[it].assertIsEnabled() }
         val runtimeOptions = compose.onAllNodesWithText(context.getString(R.string.comp_game_runtime_options))
         runtimeOptions.assertCountEquals(2)
