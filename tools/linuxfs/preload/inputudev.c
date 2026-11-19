@@ -716,6 +716,7 @@ struct enumerate {
   int matched;
   int filtered;
   int parent_node;
+  int parent_self;
   int real_parent;
   int real_listed;
   int scanned;
@@ -764,6 +765,7 @@ void *udev_enumerate_new(void *udev) {
   if (state == NULL) return enumerate;
   state->real = enumerate;
   state->parent_node = -1;
+  state->parent_self = 0;
   state->refs = 1;
   pthread_mutex_lock(&enumerate_lock);
   state->next = enumerates;
@@ -833,15 +835,20 @@ int udev_enumerate_add_match_parent(void *enumerate, void *parent) {
     if (state == NULL) return -EINVAL;
     pthread_mutex_lock(&enumerate_lock);
     state->parent_node = pad->node;
+    /* A filter on the event device selects it and its descendants; only a filter on the parent
+     * device brings the parent itself into the subtree. */
+    state->parent_self = pad->parent;
     state->real_parent = 0;
     pthread_mutex_unlock(&enumerate_lock);
     return 0;
   }
   if (real_add == NULL) real_add = next_symbol("udev_enumerate_add_match_parent");
   rc = real_add != NULL ? real_add(enumerate, parent) : -ENOSYS;
-  if (rc == 0 && state != NULL) {
+  /* libudev treats a NULL parent as a successful no-op, so it must not clear what is selected. */
+  if (rc == 0 && state != NULL && parent != NULL) {
     pthread_mutex_lock(&enumerate_lock);
     state->parent_node = -1;
+    state->parent_self = 0;
     state->real_parent = 1;
     pthread_mutex_unlock(&enumerate_lock);
   }
@@ -861,6 +868,7 @@ int udev_enumerate_scan_devices(void *enumerate) {
   char names[ENTRY_MAX][sizeof(pads[0].syspath)];
   int include;
   int parent_node;
+  int parent_self;
   int added = 0;
   int node;
   int rc;
@@ -870,6 +878,7 @@ int udev_enumerate_scan_devices(void *enumerate) {
   if (state == NULL) return rc;
   pthread_mutex_lock(&enumerate_lock);
   parent_node = state->parent_node;
+  parent_self = state->parent_self;
   include = !state->real_parent && (state->filtered ? state->matched : parent_node >= 0);
   pthread_mutex_unlock(&enumerate_lock);
   for (node = 0; node < PAD_MAX; node++) {
@@ -878,7 +887,7 @@ int udev_enumerate_scan_devices(void *enumerate) {
     names[2 * node][0] = '\0';
     names[2 * node + 1][0] = '\0';
     if (!include || (parent_node >= 0 && parent_node != node)) continue;
-    if (parent_node >= 0 && snapshot_pad(node, 1, &pad)) {
+    if (parent_node >= 0 && parent_self && snapshot_pad(node, 1, &pad)) {
       memcpy(names[2 * node], pad.syspath, sizeof(names[0]));
       added++;
     }

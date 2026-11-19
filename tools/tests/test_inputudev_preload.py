@@ -100,7 +100,7 @@ int udev_enumerate_add_match_subsystem(void *enumerate, const char *subsystem) {
   return 0;
 }
 int udev_enumerate_add_match_parent(void *enumerate, void *parent) {
-  if (parent == NULL) return -1;
+  if (parent == NULL) return 0;
   ((struct enumerate *)enumerate)->head.name = "parented";
   return 0;
 }
@@ -334,6 +334,10 @@ static void run_enumerate(void) {
   printf("bad parent %d\n", match_parent(other, NULL));
   scan(other);
   print_list("bad parent kept", list(other));
+  other = matched(&udev, "input");
+  match_parent(other, device);
+  scan(other);
+  print_list("event parent", list(other));
   other = enumerate_new(&udev);
   match(other, "fail");
   match_parent(other, parent);
@@ -510,8 +514,9 @@ class InputUdevPreloadTest(unittest.TestCase):
             "real parent suppressed parented",
             "real replaces synthetic parented",
             f"synthetic replaces real {parent} {pad}",
-            "bad parent -1",
+            "bad parent 0",
             f"bad parent kept {parent} {pad}",
+            f"event parent {pad}",
             "nothing added scan -1",
         ])
 
